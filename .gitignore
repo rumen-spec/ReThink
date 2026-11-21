@@ -1,0 +1,21 @@
+# deps / build
+node_modules/
+dist/
+.output/
+.wxt/
+.expo/
+*.tsbuildinfo
+
+# env — only *.example files are committed
+.env
+.env.*
+!.env.example
+
+# supabase local
+supabase/.temp/
+supabase/.branches/
+
+# os / editor
+.DS_Store
+*.log
+/docs

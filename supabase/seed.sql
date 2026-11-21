@@ -1,0 +1,2 @@
+-- Demo seed. Must mirror packages/shared/src/fixtures.ts exactly.
+-- Filled in during Block 2 (see docs/PLAN.md).
