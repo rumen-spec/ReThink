@@ -1,6 +1,6 @@
 # ReThink — notes for AI assistants
 
-Read `docs/SPEC.md` before changing product behaviour (§1.4 lists the invariants) and `docs/PLAN.md` for build order and status. Update PLAN.md checkboxes as work lands.
+Read `docs/SPEC.md` before changing product behaviour (§1.4 lists the invariants) and `docs/PLAN.md` for build order and status. Update PLAN.md checkboxes as work lands. `docs/DEMO.md` is the demo runbook (pitch, run of show, stores, seeded numbers, fallbacks): update it whenever a decision changes what the judges will see. `docs/RETAILERS.md` holds per-store probe evidence.
 
 ## Layout
 npm workspaces, TypeScript everywhere.
@@ -17,6 +17,7 @@ npm workspaces, TypeScript everywhere.
 - No secrets in clients. Gemini key and service-role key exist only in edge-function env. A device id is an identifier, not a credential.
 - Every event carries a client-generated `eventId` (idempotency key) and `isSimulated`. Simulated hotspot entries are always labelled as such in UI.
 - Cart snapshots are scoped to merchant + account + device/session. Do not merge retailers.
+- Product categories (`clothing`, `beauty`, …) and merchants are registries in `packages/shared/src/categories.ts` and `merchants.ts`. Add entries there; never hardcode a category key, subtype list, hostname or `/en-ca/` path in an app or edge function. Route a product to a budget with `findBudgetCategoryFor`, never by display name.
 - `packages/shared/src/fixtures.ts` and `supabase/seed.sql` must hold the same numbers.
 
 ## Commands

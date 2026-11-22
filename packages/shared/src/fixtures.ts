@@ -1,4 +1,4 @@
-import type { BudgetCategory, CartSnapshot, SavingsPlan } from './types';
+import type { BudgetCategory, CartSnapshot, SavingsPlan } from './types.ts';
 
 /**
  * THE demo fixture (docs/SPEC.md §9.3). Used by unit tests and mirrored by supabase/seed.sql.
@@ -11,8 +11,9 @@ import type { BudgetCategory, CartSnapshot, SavingsPlan } from './types';
 export const FIXTURE_OWNER_NAME = 'Alex';
 
 export const FIXTURE_CATEGORIES: BudgetCategory[] = [
-  { id: 'cat-clothing', name: 'Clothing', allocatedCents: 20_000, confirmedSpentCents: 13_500, enabled: true },
-  { id: 'cat-entertainment', name: 'Entertainment', allocatedCents: 15_000, confirmedSpentCents: 7_000, enabled: true },
+  { id: 'cat-clothing', name: 'Clothing', allocatedCents: 20_000, confirmedSpentCents: 13_500, enabled: true, productCategory: 'clothing' },
+  { id: 'cat-beauty', name: 'Beauty', allocatedCents: 8_000, confirmedSpentCents: 2_000, enabled: true, productCategory: 'beauty' },
+  { id: 'cat-entertainment', name: 'Entertainment', allocatedCents: 15_000, confirmedSpentCents: 7_000, enabled: true, productCategory: 'entertainment' },
   { id: 'cat-food', name: 'Food', allocatedCents: 25_000, confirmedSpentCents: 9_000, enabled: true },
   { id: 'cat-transport', name: 'Transport', allocatedCents: 10_000, confirmedSpentCents: 2_500, enabled: true },
 ];
@@ -27,16 +28,20 @@ export const FIXTURE_SAVINGS_PLAN: SavingsPlan = {
 export const FIXTURE_HOODIE_PRICE_CENTS = 14_800;
 export const FIXTURE_LEGGINGS_PRICE_CENTS = 9_800;
 
+/**
+ * Merchant is the automatic-cart store (docs/RETAILERS.md). Lululemon can't be `retailer-detected`
+ * (non-Shopify, no cart API), so a Lululemon cart would have to be `manual-consideration`.
+ */
 export const FIXTURE_CART: CartSnapshot = {
-  cartId: 'cart_fixture_lululemon',
-  merchantKey: 'lululemon-ca',
+  cartId: 'cart_fixture_frankandoak',
+  merchantKey: 'frankandoak-ca',
   sessionId: 'session_fixture',
   currency: 'CAD',
   source: 'retailer-detected',
   syncQuality: 'complete',
   items: [
-    { productKey: 'hoodie-1', variantKey: 'black-m', title: 'Scuba Oversized Hoodie', unitPriceCents: FIXTURE_HOODIE_PRICE_CENTS, quantity: 1 },
-    { productKey: 'leggings-1', variantKey: 'black-6', title: 'Align High-Rise Pant', unitPriceCents: FIXTURE_LEGGINGS_PRICE_CENTS, quantity: 1 },
+    { productKey: 'hoodie-1', variantKey: 'black-m', title: 'Hoodie', unitPriceCents: FIXTURE_HOODIE_PRICE_CENTS, quantity: 1 },
+    { productKey: 'leggings-1', variantKey: 'black-6', title: 'Leggings', unitPriceCents: FIXTURE_LEGGINGS_PRICE_CENTS, quantity: 1 },
   ],
   subtotalCents: 24_600,
   includesTax: false,

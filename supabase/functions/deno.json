@@ -1,0 +1,6 @@
+{
+  "imports": {
+    "@rethink/shared": "../../packages/shared/src/index.ts",
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2.49.1"
+  }
+}

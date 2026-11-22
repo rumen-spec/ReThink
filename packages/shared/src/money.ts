@@ -1,4 +1,4 @@
-import type { Cents } from './types';
+import type { Cents } from './types.ts';
 
 /** Throws unless `value` is a finite integer. Use at every boundary where money enters. */
 export function assertCents(value: unknown, label = 'amount'): asserts value is Cents {

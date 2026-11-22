@@ -4,7 +4,9 @@ ReThink is Grammarly for spending. From online carts to shopping malls, it shows
 
 **HackWestern 13 · Canada Life "Future Me" challenge.**
 
-As you look at clothing on Lululemon, Nike or Uniqlo, a Chrome overlay shows what buying it means for this month's Clothing budget. A mirrored cart keeps the "Future Me" savings graph on your iPhone in sync, and a consented iPhone entering a mall geofence sends you a reminder before you walk in. ReThink informs; it never blocks checkout or touches payment.
+As you look at a hoodie on Alo or a lipstick on Fenty Beauty, a Chrome overlay shows what buying it means for this month's Clothing or Beauty budget. A mirrored cart keeps the "Future Me" savings graph on your iPhone in sync, and a consented iPhone entering a mall geofence sends you a reminder before you walk in. ReThink informs; it never blocks checkout or touches payment.
+
+Demo stores are Shopify storefronts (Frank And Oak, Alo, OVO, Fenty Beauty, tentree, Peace Collective) plus Lululemon overlay-only; see `docs/RETAILERS.md`.
 
 ## Repo layout
 
@@ -50,7 +52,8 @@ cd apps/mobile && npx eas init && cd ../..
 | `npm run mobile` | Expo dev server. Scan the QR with Expo Go. |
 | `npm run extension` | WXT dev server. It opens Chrome with the extension loaded; edits hot-reload. |
 | `npm run extension:build` | Production build to `apps/extension/.output/` (load unpacked from there) |
-| `npm run db:push` | Apply migrations to the linked hosted project |
+| `npm run db:push` | Apply migrations + `seed.sql` (functions only) to the linked hosted project; prompts for the DB password |
+| `npm run functions:deploy` | Deploy all edge functions to the hosted project (no Docker; JWT verified in-function) |
 | `npm run db:start` / `db:reset` | Local Supabase via Docker, re-seeded from `supabase/seed.sql` |
 | `npm run db:functions` | Serve edge functions locally with `supabase/functions/.env` |
 
