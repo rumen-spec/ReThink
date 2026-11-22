@@ -1,5 +1,5 @@
 // Browser publishes a merchant-scoped cart snapshot. §7.5, §12.2, §13.3. Never an expense.
-import { cartSubtotalCents, isMerchantKey, type CartItem } from '@rethink/shared';
+import { cartSubtotalCents, cartSubtotalsByCategory, isMerchantKey, isProductCategoryKey, isSubtypeOf, type CartItem } from '@rethink/shared';
 import { adminClient } from '../_shared/env.ts';
 import { resolveCaller } from '../_shared/auth.ts';
 import { emitEvent } from '../_shared/events.ts';
@@ -21,12 +21,18 @@ function parseItems(raw: unknown): CartItem[] {
     }
     const qty = o.quantity;
     if (typeof qty !== 'number' || !Number.isInteger(qty) || qty < 0 || qty > 99) throw new HttpError(400, `items[${i}].quantity invalid`, 'bad-input');
+    const cat = o.productCategory;
+    if (!isProductCategoryKey(cat)) throw new HttpError(400, `items[${i}].productCategory must be a registry key ('other' if nothing fits)`, 'bad-input');
+    const sub = o.subtype ?? undefined;
+    if (sub !== undefined && !isSubtypeOf(cat, sub)) throw new HttpError(400, `items[${i}].subtype does not belong to ${cat}`, 'bad-input');
     return {
       productKey: requireString(o.productKey, `items[${i}].productKey`),
       variantKey: typeof o.variantKey === 'string' ? o.variantKey : null,
       title: requireString(o.title, `items[${i}].title`, 300),
       unitPriceCents: price as number | null,
       quantity: qty,
+      productCategory: cat,
+      ...(sub !== undefined ? { subtype: sub } : {}),
       ...(typeof o.imageUrl === 'string' && o.imageUrl.startsWith('https://') ? { imageUrl: o.imageUrl.slice(0, 500) } : {}),
     };
   });
@@ -40,7 +46,7 @@ function oneOf<T extends readonly string[]>(v: unknown, allowed: T, name: string
 
 async function fingerprintOf(items: CartItem[], source: string, subtotal: number | null): Promise<string> {
   const canon = [...items]
-    .map((i) => [i.productKey, i.variantKey ?? '', i.unitPriceCents ?? 'null', i.quantity].join('|'))
+    .map((i) => [i.productKey, i.variantKey ?? '', i.unitPriceCents ?? 'null', i.quantity, i.productCategory ?? 'null'].join('|'))
     .sort()
     .join('\n');
   return sha256Hex(`${source}\n${subtotal ?? 'null'}\n${canon}`);
@@ -68,6 +74,7 @@ Deno.serve(handle(async (req) => {
 
   // Server recomputes the subtotal with the shared function; the client's number is never trusted.
   const subtotalCents = cartSubtotalCents(items);
+  const byCategory = cartSubtotalsByCategory(items);
   const fingerprint = await fingerprintOf(items, source, subtotalCents);
 
   const scope = { owner_id: caller.ownerId, merchant_key: merchantKey, device_id: caller.deviceId, session_id: sessionId };
@@ -108,10 +115,10 @@ Deno.serve(handle(async (req) => {
     deviceId: caller.deviceId,
     source: 'browser',
     type: 'CART_UPDATED',
-    payload: { merchantKey, cartId, cartVersion: nextVersion, subtotalCents, itemCount: items.reduce((n, i) => n + i.quantity, 0), syncQuality },
+    payload: { merchantKey, cartId, cartVersion: nextVersion, subtotalCents, byCategory, itemCount: items.reduce((n, i) => n + i.quantity, 0), syncQuality },
     isSimulated: false,
     occurredAt: observedAt,
   });
 
-  return json({ cartId, version: nextVersion, subtotalCents, fingerprint, eventRecorded: emitted.inserted });
+  return json({ cartId, version: nextVersion, subtotalCents, byCategory, fingerprint, eventRecorded: emitted.inserted });
 }));

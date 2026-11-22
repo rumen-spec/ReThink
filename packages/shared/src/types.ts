@@ -54,6 +54,13 @@ export interface CartItem {
   /** null when unknown → subtotal becomes "partial" and impact is disabled. */
   unitPriceCents: Cents | null;
   quantity: number;
+  /**
+   * Budget this line routes to, decided per product (SPEC §1.3 "per product, not per website").
+   * Never empty: a keychain on a beauty store is `'other'`. A cart can mix categories;
+   * see `cartSubtotalsByCategory`.
+   */
+  productCategory: ProductCategoryKey;
+  subtype?: ProductSubtype;
   imageUrl?: string;
   source?: CartSource;
   confidence?: PriceConfidence;
@@ -173,10 +180,10 @@ export interface ClassificationContext {
 /** §15.2 — constrained Gemini output. Reject anything outside this shape. */
 export interface GeminiClassification {
   isProductPage: boolean;
-  /** null = a product, but not one we budget (e.g. a keychain on a beauty store). Validate with `isProductCategoryKey`. */
-  category: ProductCategoryKey | null;
+  /** Always a registry key; `'other'` for a real product that fits nothing else. Validate with `isProductCategoryKey`. */
+  category: ProductCategoryKey;
   /** Must belong to `category` (`isSubtypeOf`); the server rejects mismatches. */
-  subtype: ProductSubtype | null;
+  subtype: ProductSubtype;
   normalizedTitle: string;
   /** Unverified until corroborated by DOM/metadata or edited by the user. */
   suggestedPriceCents: Cents | null;

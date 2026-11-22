@@ -1,3 +1,4 @@
+import type { ProductCategoryKey } from './categories.ts';
 import { assertCents } from './money.ts';
 import type { BudgetCategory, CartItem, Cents } from './types.ts';
 
@@ -37,6 +38,27 @@ export function cartSubtotalCents(items: CartItem[]): Cents | null {
     total += item.unitPriceCents * item.quantity;
   }
   return total;
+}
+
+/** One entry per category present in the cart; null when any line in that category has an unknown price. */
+export type CategorySubtotals = Partial<Record<ProductCategoryKey, Cents | null>>;
+
+/**
+ * Split a (possibly mixed) cart into per-category subtotals, so each budget is compared only
+ * against the lines that belong to it. A Fenty cart with lipstick + keychain → beauty: lipstick,
+ * other: keychain. Feed each entry to `computeBudgetConsequence` with the budget that
+ * `findBudgetCategoryFor` returns for that key (or show "Set a … budget" when it returns null).
+ */
+export function cartSubtotalsByCategory(items: CartItem[]): CategorySubtotals {
+  const groups = new Map<ProductCategoryKey, CartItem[]>();
+  for (const item of items) {
+    const g = groups.get(item.productCategory);
+    if (g) g.push(item);
+    else groups.set(item.productCategory, [item]);
+  }
+  const out: CategorySubtotals = {};
+  for (const [key, group] of groups) out[key] = cartSubtotalCents(group);
+  return out;
 }
 
 export function computeBudgetConsequence(

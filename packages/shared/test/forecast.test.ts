@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { projectSavings } from './forecast.ts';
-import { FIXTURE_SAVINGS_PLAN } from './fixtures.ts';
+import { projectSavings } from '../src/forecast.ts';
+import { FIXTURE_SAVINGS_PLAN } from '../src/fixtures.ts';
 
 const base = {
   openingBalanceCents: FIXTURE_SAVINGS_PLAN.openingBalanceCents,

@@ -1,5 +1,5 @@
 -- Demo seed. MUST mirror packages/shared/src/fixtures.ts exactly (CLAUDE.md).
---   Clothing $200 / $135 spent · Beauty $80 / $20 · Entertainment $150 / $70 · Food $250 / $90 · Transport $100 / $25
+--   Clothing $200 / $135 spent · Beauty $80 / $20 · Entertainment $150 / $70 · Food $250 / $90 · Transport $100 / $25 · Other $50 / $0
 --   Savings: $1,000 opening, $300/month, 0%, 120 months
 --   Hotspot: Masonville Place, 250 m, coordinates UNVERIFIED (verified = false)
 --
@@ -43,6 +43,8 @@ begin
   values (p_owner, v_period, 'Food', 25000, true, null, 4) returning id into v_food;
   insert into budget_categories (owner_id, period_id, name, allocated_cents, enabled, product_category, sort_order)
   values (p_owner, v_period, 'Transport', 10000, true, null, 5) returning id into v_transport;
+  insert into budget_categories (owner_id, period_id, name, allocated_cents, enabled, product_category, sort_order)
+  values (p_owner, v_period, 'Other', 5000, true, 'other', 6);
 
   insert into expenses (owner_id, period_id, category_id, amount_cents, source, confirmed_at) values
     (p_owner, v_period, v_clothing,  13500, 'seed', date '2026-11-10'),

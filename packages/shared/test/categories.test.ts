@@ -7,12 +7,13 @@ import {
   getProductCategory,
   isProductCategoryKey,
   isSubtypeOf,
-} from './categories.ts';
-import { FIXTURE_CATEGORIES } from './fixtures.ts';
+} from '../src/categories.ts';
+import { FIXTURE_CATEGORIES } from '../src/fixtures.ts';
 
 describe('PRODUCT_CATEGORIES registry', () => {
-  it('has five categories with unique lowercase keys', () => {
-    expect(PRODUCT_CATEGORIES).toHaveLength(5);
+  it('has six categories (five real + other) with unique lowercase keys', () => {
+    expect(PRODUCT_CATEGORIES).toHaveLength(6);
+    expect(PRODUCT_CATEGORIES.at(-1)!.key).toBe('other');
     const keys = PRODUCT_CATEGORIES.map((c) => c.key);
     expect(new Set(keys).size).toBe(keys.length);
     for (const k of keys) expect(k).toMatch(/^[a-z][a-z-]*$/);
@@ -21,7 +22,7 @@ describe('PRODUCT_CATEGORIES registry', () => {
     for (const c of PRODUCT_CATEGORIES) {
       expect(c.label.length).toBeGreaterThan(0);
       expect(c.scope.length).toBeGreaterThan(10);
-      expect(c.keywords.length).toBeGreaterThan(0);
+      if (c.key !== 'other') expect(c.keywords.length).toBeGreaterThan(0);
       expect(c.subtypes.at(-1)).toBe('other');
       expect(new Set(c.subtypes).size).toBe(c.subtypes.length);
     }

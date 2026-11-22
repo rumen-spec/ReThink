@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "skills": {
+    "immersive": {
+      "source": "bergside/awesome-design-skills",
+      "commit": "f631a09b4fcc0166f2e2c1a8c81906ef680c57e8",
+      "sourceType": "github",
+      "skillPath": "skills/immersive/SKILL.md",
+      "computedHash": "156c2e6e5f72fe6b7b79cce53e1fbae40b9a83cbfd661def2469b61d386c4075"
+    }
+  }
+}

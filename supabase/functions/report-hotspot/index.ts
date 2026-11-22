@@ -18,9 +18,9 @@ Deno.serve(handle(async (req) => {
   const hotspotId = requireUuid(b.hotspotId, 'hotspotId');
   const eventId = requireUuid(b.eventId, 'eventId');
   const occurredAt = optionalIso(b.occurredAt, 'occurredAt');
+  // Either device may send a labelled test/simulated entry (the trigger phone has its own "Test entry"
+  // button, SPEC §10.3). It is recorded as HOTSPOT_SIMULATED and never presented as a real callback.
   const isSimulated = b.isSimulated === true;
-  // A trigger device can only report what its OS told it; the owner's phone may simulate from Demo tools.
-  if (caller.kind === 'device' && isSimulated) throw new HttpError(403, 'Trigger devices cannot submit simulated entries', 'forbidden');
 
   const { data: hotspot } = await admin
     .from('hotspots')

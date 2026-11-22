@@ -8,6 +8,7 @@ npm workspaces, TypeScript everywhere.
 - `apps/mobile` — Expo SDK 58, expo-router, `src/app/`. Runs on a physical iPhone (Expo Go for UI; EAS dev build for geofencing/push). No Xcode on this Mac; native builds go through EAS.
 - `apps/extension` — WXT + React, Manifest V3. Entrypoints in `entrypoints/`.
 - `supabase/` — migrations, edge functions (Deno), `seed.sql`.
+- Tests live in a `test/` folder beside `src/` in every workspace (`packages/shared/test/*.test.ts`, `apps/*/test/`), never co-located in `src/`. Import the unit under test as `../src/<file>.ts`.
 
 ## Rules that are easy to break
 - UI is dark-first (deep charcoal-teal canvas, never pure `#000`). Tokens are in `docs/PLAN.md` Block 4 until the apps own them.

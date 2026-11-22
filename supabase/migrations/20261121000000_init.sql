@@ -17,7 +17,8 @@ insert into public.product_categories (key, label, sort_order) values
   ('beauty', 'Beauty', 2),
   ('electronics', 'Electronics', 3),
   ('home', 'Home', 4),
-  ('entertainment', 'Entertainment', 5);
+  ('entertainment', 'Entertainment', 5),
+  ('other', 'Other', 6);
 
 create table public.merchants (
   key   text primary key,
@@ -87,9 +88,12 @@ create table public.expenses (
   confirmed_at     timestamptz not null default now(),
   created_at       timestamptz not null default now(),
   check ((source = 'reversal') = (reversal_of is not null)),
-  check ((source = 'reversal' and amount_cents < 0) or (source <> 'reversal' and amount_cents > 0))
+  check ((source = 'reversal' and amount_cents < 0) or (source <> 'reversal' and amount_cents > 0)),
+  -- A confirmed purchase always names the store; manual/seed entries have none.
+  check (source <> 'purchase-confirmed' or (merchant_key is not null and confirmation_key is not null))
 );
-create unique index expenses_confirmation_key on public.expenses (owner_id, confirmation_key) where confirmation_key is not null;
+-- One confirmation may land in several budgets (a mixed cart) → one row per category, same key.
+create unique index expenses_confirmation_key on public.expenses (owner_id, confirmation_key, category_id) where confirmation_key is not null;
 create unique index expenses_one_reversal on public.expenses (reversal_of) where reversal_of is not null;
 create index expenses_category on public.expenses (category_id);
 

@@ -16,6 +16,7 @@ export const FIXTURE_CATEGORIES: BudgetCategory[] = [
   { id: 'cat-entertainment', name: 'Entertainment', allocatedCents: 15_000, confirmedSpentCents: 7_000, enabled: true, productCategory: 'entertainment' },
   { id: 'cat-food', name: 'Food', allocatedCents: 25_000, confirmedSpentCents: 9_000, enabled: true },
   { id: 'cat-transport', name: 'Transport', allocatedCents: 10_000, confirmedSpentCents: 2_500, enabled: true },
+  { id: 'cat-other', name: 'Other', allocatedCents: 5_000, confirmedSpentCents: 0, enabled: true, productCategory: 'other' },
 ];
 
 export const FIXTURE_SAVINGS_PLAN: SavingsPlan = {
@@ -40,8 +41,8 @@ export const FIXTURE_CART: CartSnapshot = {
   source: 'retailer-detected',
   syncQuality: 'complete',
   items: [
-    { productKey: 'hoodie-1', variantKey: 'black-m', title: 'Hoodie', unitPriceCents: FIXTURE_HOODIE_PRICE_CENTS, quantity: 1 },
-    { productKey: 'leggings-1', variantKey: 'black-6', title: 'Leggings', unitPriceCents: FIXTURE_LEGGINGS_PRICE_CENTS, quantity: 1 },
+    { productKey: 'hoodie-1', variantKey: 'black-m', title: 'Hoodie', unitPriceCents: FIXTURE_HOODIE_PRICE_CENTS, quantity: 1, productCategory: 'clothing', subtype: 'outerwear' },
+    { productKey: 'leggings-1', variantKey: 'black-6', title: 'Leggings', unitPriceCents: FIXTURE_LEGGINGS_PRICE_CENTS, quantity: 1, productCategory: 'clothing', subtype: 'bottoms' },
   ],
   subtotalCents: 24_600,
   includesTax: false,

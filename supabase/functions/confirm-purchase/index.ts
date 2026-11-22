@@ -1,45 +1,65 @@
 // "I bought this": the ONLY path that turns a cart into confirmed spending. §7.6, §9.2, §13.3.
-// Idempotent on confirmationKey; supports a reversal (undo) that appends a negative ledger row.
-import { findBudgetCategoryFor, isMerchantKey, isProductCategoryKey, type BudgetCategory } from '@rethink/shared';
+// A confirmation is split per budget category (a mixed cart → one ledger row per category, all sharing
+// the confirmation key). Idempotent on confirmationKey. `action: 'reverse'` appends negative rows (undo).
+import { findBudgetCategoryFor, isMerchantKey, isProductCategoryKey, type BudgetCategory, type ProductCategoryKey } from '@rethink/shared';
 import { adminClient } from '../_shared/env.ts';
 import { resolveCaller } from '../_shared/auth.ts';
 import { emitEvent } from '../_shared/events.ts';
 import { handle, HttpError, json, optionalIso, readJson, requireCents, requireString, requireUuid } from '../_shared/http.ts';
 
+interface Allocation {
+  productCategory: ProductCategoryKey;
+  amountCents: number;
+}
+
+/** `allocations: [{ productCategory, amountCents }]` — what the user actually paid, per budget. */
+function parseAllocations(raw: unknown): Allocation[] {
+  if (!Array.isArray(raw) || raw.length === 0 || raw.length > 10) throw new HttpError(400, 'allocations must be a non-empty array', 'bad-input');
+  const seen = new Set<string>();
+  return raw.map((a, i) => {
+    const o = (a ?? {}) as Record<string, unknown>;
+    const key = requireString(o.productCategory, `allocations[${i}].productCategory`, 40);
+    if (!isProductCategoryKey(key)) throw new HttpError(422, `Unknown product category ${key}`, 'unknown-category');
+    if (seen.has(key)) throw new HttpError(400, `allocations: duplicate category ${key}`, 'bad-input');
+    seen.add(key);
+    return { productCategory: key, amountCents: requireCents(o.amountCents, `allocations[${i}].amountCents`, { min: 1 }) };
+  });
+}
+
 Deno.serve(handle(async (req) => {
   const admin = adminClient();
   const caller = await resolveCaller(req, admin, ['owner', 'browser']);
   const b = await readJson(req);
-  const action = b.action === 'reverse' ? 'reverse' : 'confirm';
+  const source = caller.kind === 'device' ? 'browser' : 'ios-owner';
 
   const { data: period } = await admin.from('budget_periods').select('id').eq('owner_id', caller.ownerId).eq('is_active', true).maybeSingle();
   if (!period) throw new HttpError(422, 'No active budget period', 'no-period');
 
-  if (action === 'reverse') {
-    const expenseId = requireUuid(b.expenseId, 'expenseId');
+  // ---- Undo ---------------------------------------------------------------------------------
+  if (b.action === 'reverse') {
     const eventId = requireUuid(b.eventId, 'eventId');
-    const { data: original } = await admin
+    let q = admin
       .from('expenses')
       .select('id, category_id, amount_cents, source, merchant_key, confirmation_key')
-      .eq('id', expenseId)
       .eq('owner_id', caller.ownerId)
-      .maybeSingle();
-    if (!original) throw new HttpError(404, 'Expense not found', 'not-found');
-    if (original.source === 'reversal') throw new HttpError(422, 'Cannot reverse a reversal', 'bad-input');
+      .neq('source', 'reversal');
+    if (typeof b.confirmationKey === 'string') q = q.eq('confirmation_key', requireUuid(b.confirmationKey, 'confirmationKey'));
+    else q = q.eq('id', requireUuid(b.expenseId, 'expenseId'));
+    const { data: originals } = await q;
+    if (!originals || originals.length === 0) throw new HttpError(404, 'Expense not found', 'not-found');
 
-    const { data: reversal, error } = await admin
+    const { data: reversals, error } = await admin
       .from('expenses')
-      .insert({
+      .insert(originals.map((o) => ({
         owner_id: caller.ownerId,
         period_id: period.id,
-        category_id: original.category_id,
-        amount_cents: -original.amount_cents,
+        category_id: o.category_id,
+        amount_cents: -o.amount_cents,
         source: 'reversal',
-        merchant_key: original.merchant_key,
-        reversal_of: original.id,
-      })
-      .select('id')
-      .single();
+        merchant_key: o.merchant_key,
+        reversal_of: o.id,
+      })))
+      .select('id, reversal_of, amount_cents');
     if (error) {
       if (error.code === '23505') return json({ reversed: true, alreadyReversed: true });
       throw error;
@@ -48,22 +68,22 @@ Deno.serve(handle(async (req) => {
       eventId,
       ownerId: caller.ownerId,
       deviceId: caller.deviceId,
-      source: caller.kind === 'device' ? 'browser' : 'ios-owner',
+      source,
       type: 'PURCHASE_CONFIRMED',
-      payload: { reversalOf: original.id, expenseId: reversal.id, amountCents: -original.amount_cents, merchantKey: original.merchant_key },
+      payload: { reversal: true, reversals, totalCents: -originals.reduce((n, o) => n + o.amount_cents, 0), merchantKey: originals[0]!.merchant_key },
       isSimulated: false,
       occurredAt: new Date().toISOString(),
     });
-    return json({ reversed: true, reversalId: reversal.id });
+    return json({ reversed: true, reversals });
   }
 
+  // ---- Confirm ------------------------------------------------------------------------------
   const confirmationKey = requireUuid(b.confirmationKey, 'confirmationKey');
   const eventId = typeof b.eventId === 'string' ? requireUuid(b.eventId, 'eventId') : confirmationKey;
-  const amountCents = requireCents(b.amountCents, 'amountCents', { min: 1 });
   const merchantKey = requireString(b.merchantKey, 'merchantKey', 40);
   if (!isMerchantKey(merchantKey)) throw new HttpError(422, `Unknown merchant ${merchantKey}`, 'unknown-merchant');
-  const productCategory = requireString(b.productCategory, 'productCategory', 40);
-  if (!isProductCategoryKey(productCategory)) throw new HttpError(422, `Unknown product category ${productCategory}`, 'unknown-category');
+  const allocations = parseAllocations(b.allocations);
+  const totalCents = allocations.reduce((n, a) => n + a.amountCents, 0);
   const cartId = typeof b.cartId === 'string' ? b.cartId.slice(0, 120) : null;
   const confirmedAt = optionalIso(b.confirmedAt, 'confirmedAt');
 
@@ -80,37 +100,38 @@ Deno.serve(handle(async (req) => {
     enabled: c.enabled,
     productCategory: c.product_category ?? undefined,
   }));
-  const target = findBudgetCategoryFor(shaped, productCategory);
-  if (!target) throw new HttpError(422, `No enabled budget for ${productCategory}`, 'no-budget');
+  const targets = allocations.map((a) => {
+    const t = findBudgetCategoryFor(shaped, a.productCategory);
+    if (!t) throw new HttpError(422, `No enabled budget for ${a.productCategory}`, 'no-budget');
+    return { ...a, categoryId: t.id, categoryName: t.name };
+  });
 
+  // One statement for all rows: either every row inserts or (on a retry) none do.
   const { data: inserted, error } = await admin
     .from('expenses')
-    .insert({
+    .insert(targets.map((t) => ({
       owner_id: caller.ownerId,
       period_id: period.id,
-      category_id: target.id,
-      amount_cents: amountCents,
+      category_id: t.categoryId,
+      amount_cents: t.amountCents,
       source: 'purchase-confirmed',
       merchant_key: merchantKey,
       confirmation_key: confirmationKey,
       confirmed_at: confirmedAt,
-    })
-    .select('id')
-    .maybeSingle();
+    })))
+    .select('id, category_id, amount_cents');
 
-  let expenseId: string;
+  let rows = inserted ?? [];
   let duplicate = false;
   if (error) {
     if (error.code !== '23505') throw error;
-    const { data: prior } = await admin.from('expenses').select('id').eq('owner_id', caller.ownerId).eq('confirmation_key', confirmationKey).single();
-    expenseId = prior!.id;
+    const { data: prior } = await admin.from('expenses').select('id, category_id, amount_cents').eq('owner_id', caller.ownerId).eq('confirmation_key', confirmationKey);
+    rows = prior ?? [];
     duplicate = true;
-  } else {
-    expenseId = inserted!.id;
   }
 
   if (!duplicate && cartId) {
-    // The pending scenario is gone: archive the matching cart(s) so Home stops showing it as proposed.
+    // The pending scenario is gone: archive the matching cart so Home stops showing it as proposed.
     await admin
       .from('cart_snapshots')
       .update({ archived_at: new Date().toISOString() })
@@ -120,16 +141,21 @@ Deno.serve(handle(async (req) => {
       .is('archived_at', null);
   }
 
+  const expenses = rows.map((r) => {
+    const t = targets.find((x) => x.categoryId === r.category_id);
+    return { expenseId: r.id, categoryId: r.category_id, categoryName: t?.categoryName ?? null, productCategory: t?.productCategory ?? null, amountCents: r.amount_cents };
+  });
+
   const emitted = await emitEvent(admin, {
     eventId,
     ownerId: caller.ownerId,
     deviceId: caller.deviceId,
-    source: caller.kind === 'device' ? 'browser' : 'ios-owner',
+    source,
     type: 'PURCHASE_CONFIRMED',
-    payload: { expenseId, amountCents, merchantKey, productCategory, categoryId: target.id, cartId },
+    payload: { confirmationKey, merchantKey, cartId, totalCents, expenses },
     isSimulated: false,
     occurredAt: confirmedAt,
   });
 
-  return json({ expenseId, categoryId: target.id, categoryName: target.name, amountCents, duplicate, eventRecorded: emitted.inserted });
+  return json({ confirmationKey, totalCents, expenses, duplicate, eventRecorded: emitted.inserted });
 }));

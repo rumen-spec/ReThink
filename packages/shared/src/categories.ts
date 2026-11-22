@@ -85,6 +85,15 @@ export const PRODUCT_CATEGORIES = [
       'record', 'album', 'cd', 'puzzle', 'board game', 'lego', 'collectible', 'figure', 'poster',
     ],
   },
+  {
+    // The catch-all. A cart line is never uncategorised: merch, keychains, gift cards land here and
+    // count against the user's "Other" budget if they have one. Decided 2026-11-21.
+    key: 'other',
+    label: 'Other',
+    subtypes: ['other'],
+    scope: 'A real product that fits none of the categories above (merch, keychains, gift cards, stationery).',
+    keywords: [],
+  },
 ] as const satisfies readonly ProductCategoryDef[];
 
 export type ProductCategoryKey = (typeof PRODUCT_CATEGORIES)[number]['key'];

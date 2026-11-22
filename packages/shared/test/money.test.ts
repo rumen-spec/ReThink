@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assertCents, formatCad, parseCadToCents } from './money.ts';
+import { assertCents, formatCad, parseCadToCents } from '../src/money.ts';
 
 describe('formatCad', () => {
   it('formats cents with two decimals', () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { cartSubtotalCents, computeBudgetConsequence, sortPressingBudgets } from './budget.ts';
-import { FIXTURE_CART, FIXTURE_CATEGORIES, FIXTURE_HOODIE_PRICE_CENTS } from './fixtures.ts';
-import type { BudgetCategory } from './types.ts';
+import { cartSubtotalCents, computeBudgetConsequence, sortPressingBudgets } from '../src/budget.ts';
+import { FIXTURE_CART, FIXTURE_CATEGORIES, FIXTURE_HOODIE_PRICE_CENTS } from '../src/fixtures.ts';
+import type { BudgetCategory } from '../src/types.ts';
 
 const clothing = FIXTURE_CATEGORIES.find((c) => c.name === 'Clothing')!;
 const cat = (over: Partial<BudgetCategory>): BudgetCategory => ({

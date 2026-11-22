@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { isProductCategoryKey } from './categories.ts';
-import { FIXTURE_CART } from './fixtures.ts';
-import { MERCHANTS, MERCHANT_HOSTS, findMerchantByHost, getMerchant, isMerchantKey } from './merchants.ts';
+import { isProductCategoryKey } from '../src/categories.ts';
+import { FIXTURE_CART } from '../src/fixtures.ts';
+import { MERCHANTS, MERCHANT_HOSTS, findMerchantByHost, getMerchant, isMerchantKey } from '../src/merchants.ts';
 
 describe('MERCHANTS registry', () => {
   it('has unique keys and no host claimed by two merchants', () => {
