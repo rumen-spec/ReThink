@@ -11,13 +11,16 @@
  */
 import {
   AI_THRESHOLD,
+  cartSubtotalsByCategory,
   classifyProduct,
   colorForBudget,
   computeBudgetConsequence,
   findBudgetCategoryFor,
   findMerchantByHost,
   formatCad,
+  getMerchant,
   getProductCategory,
+  isProductCategoryKey,
   MERCHANT_HOSTS,
   type BudgetCategory,
   type MerchantDef,
@@ -62,10 +65,50 @@ export default defineContentScript({
       void tick();
     });
 
+    /**
+     * What this store's mirrored cart would do, for when the shopper is not on a product page.
+     * Without it the overlay simply vanishes off a product page, which reads as "broken" rather
+     * than "nothing to say here".
+     */
+    function cartView(snap: BrowserSnapshot): { state: OverlayState; color: string } | null {
+      const cart = snap.carts.filter((c) => c.merchant_key === store.key && Array.isArray(c.items) && c.items.length > 0).sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1))[0];
+      if (!cart) return null;
+
+      const enabled: BudgetCategory[] = snap.categories.filter((c) => c.enabled);
+      const by = cartSubtotalsByCategory(cart.items);
+      let worst: { name: string; overCents: number } | null = null;
+      let color = '#9AA1A7';
+      let first = true;
+      for (const [key, cents] of Object.entries(by)) {
+        if (cents === null || !isProductCategoryKey(key)) continue;
+        const budget = findBudgetCategoryFor(enabled, key);
+        if (first) {
+          color = budget ? colorForBudget(budget) : getProductCategory(key).color.dark;
+          first = false;
+        }
+        if (!budget) continue;
+        const over = computeBudgetConsequence(budget, cents).cartOverageCents ?? 0;
+        if (over > 0 && (!worst || over > worst.overCents)) worst = { name: budget.name, overCents: over };
+      }
+
+      const itemCount = cart.items.reduce((n, i) => n + i.quantity, 0);
+      return {
+        state: {
+          kind: 'cart',
+          merchantLabel: getMerchant(store.key as Parameters<typeof getMerchant>[0]).label,
+          itemCount,
+          subtotalText: cart.subtotal_cents === null ? 'Partial total' : formatCad(cart.subtotal_cents),
+          line: worst ? `${formatCad(worst.overCents)} over your ${worst.name} budget.` : 'This fits your budgets.',
+          over: worst !== null,
+        },
+        color,
+      };
+    }
+
     /** The one place the overlay's words are decided. All money comes from the shared functions. */
     function viewFor(p: DetectedProduct | null, snap: BrowserSnapshot | null): { state: OverlayState; color: string } {
-      if (!p) return { state: { kind: 'hidden' }, color: '#9AA1A7' };
       if (!pairing) return { state: { kind: 'unpaired' }, color: '#9AA1A7' };
+      if (!p) return (snap ? cartView(snap) : null) ?? { state: { kind: 'hidden' }, color: '#9AA1A7' };
       if (p.currency !== 'CAD') return { state: { kind: 'wrong-currency', currency: p.currency || 'another currency' }, color: '#9AA1A7' };
       if (!snap) return { state: { kind: 'hidden' }, color: '#9AA1A7' };
 
@@ -117,6 +160,10 @@ export default defineContentScript({
     async function refreshProduct(): Promise<void> {
       const url = new URL(location.href);
       product = await detectProduct(store, url);
+      if (!product) {
+        // Says plainly whether this is "not a product page" or "the product JSON would not load".
+        l.info('no product on this page', { path: url.pathname, looksLikeProduct: /\/products\//.test(url.pathname) });
+      }
       if (product) {
         const verdict = classifyProduct(product.context);
         l.info('product detected', {

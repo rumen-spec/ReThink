@@ -1,10 +1,11 @@
 // "I bought this": the ONLY path that turns a cart into confirmed spending. §7.6, §9.2, §13.3.
 // A confirmation is split per budget category (a mixed cart → one ledger row per category, all sharing
 // the confirmation key). Idempotent on confirmationKey. `action: 'reverse'` appends negative rows (undo).
-import { findBudgetCategoryFor, isMerchantKey, isProductCategoryKey, type BudgetCategory, type ProductCategoryKey } from '@rethink/shared';
+import { findBudgetCategoryFor, formatCad, getMerchant, isMerchantKey, isProductCategoryKey, type BudgetCategory, type ProductCategoryKey } from '@rethink/shared';
 import { adminClient } from '../_shared/env.ts';
 import { resolveCaller } from '../_shared/auth.ts';
 import { emitEvent } from '../_shared/events.ts';
+import { notifyOwnerPhones } from '../_shared/push.ts';
 import { handle, HttpError, json, optionalIso, readJson, requireCents, requireString, requireUuid } from '../_shared/http.ts';
 
 interface Allocation {
@@ -64,16 +65,26 @@ Deno.serve(handle(async (req) => {
       if (error.code === '23505') return json({ reversed: true, alreadyReversed: true });
       throw error;
     }
-    await emitEvent(admin, {
+    const back = originals.reduce((n, o) => n + o.amount_cents, 0);
+    const emittedReversal = await emitEvent(admin, {
       eventId,
       ownerId: caller.ownerId,
       deviceId: caller.deviceId,
       source,
       type: 'PURCHASE_CONFIRMED',
-      payload: { reversal: true, reversals, totalCents: -originals.reduce((n, o) => n + o.amount_cents, 0), merchantKey: originals[0]!.merchant_key },
+      payload: { reversal: true, reversals, totalCents: -back, merchantKey: originals[0]!.merchant_key },
       isSimulated: false,
       occurredAt: new Date().toISOString(),
     });
+    // A receipt is only news on another device: undoing on the phone needs no push to the phone.
+    if (caller.kind === 'device' && emittedReversal.inserted) {
+      await notifyOwnerPhones(admin, caller.ownerId, emittedReversal.id, 'cart', {
+        type: 'PURCHASE_REVERSED',
+        title: 'Purchase undone',
+        body: `${formatCad(back)} is back in your budgets.`,
+        data: { reversal: true },
+      });
+    }
     return json({ reversed: true, reversals });
   }
 
@@ -156,6 +167,19 @@ Deno.serve(handle(async (req) => {
     isSimulated: false,
     occurredAt: confirmedAt,
   });
+
+  // Receipt on the phone when the purchase was confirmed somewhere else (the browser).
+  // The budget line is the point: this is the moment the number actually moved.
+  if (caller.kind === 'device' && emitted.inserted && !duplicate) {
+    const label = isMerchantKey(merchantKey) ? getMerchant(merchantKey).label : merchantKey;
+    const names = expenses.map((e) => e.categoryName).filter((n): n is string => !!n);
+    await notifyOwnerPhones(admin, caller.ownerId, emitted.id, 'cart', {
+      type: 'PURCHASE_CONFIRMED',
+      title: `${formatCad(totalCents)} at ${label}`,
+      body: names.length > 0 ? `Recorded against ${names.join(' and ')}. Undo from the extension if that was wrong.` : 'Recorded.',
+      data: { confirmationKey, merchantKey },
+    });
+  }
 
   return json({ confirmationKey, totalCents, expenses, duplicate, eventRecorded: emitted.inserted });
 }));

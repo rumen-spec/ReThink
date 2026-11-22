@@ -1,17 +1,16 @@
 import { StyleSheet, View } from 'react-native';
 
-import { Body, Caption, Hero as HeroText } from '@/components/ui/text';
-import { T } from '@/constants/theme';
+import { Caption, Hero as HeroText } from '@/components/ui/text';
 
-export type StateTone = 'muted' | 'good' | 'over';
-
-/** The one loud number on the bare canvas, with a single state line under it. No glow: nothing behind the figure competes with it. */
-export function Hero({ label, value, state, tone }: { label: string; value: string; state: string; tone: StateTone }) {
+/**
+ * The one loud number, on the bare canvas. No glow and no commentary under it: whether a cart puts
+ * a budget over is said by the budget cards going red, which is the same fact in fewer words.
+ */
+export function Hero({ label, value }: { label: string; value: string }) {
   return (
     <View style={s.wrap}>
       <Caption>{label}</Caption>
       <HeroText accessibilityLabel={`${value} ${label}`}>{value}</HeroText>
-      <Body color={tone === 'over' ? T.coral : tone === 'good' ? T.accent : T.muted}>{state}</Body>
     </View>
   );
 }

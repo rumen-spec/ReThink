@@ -2,6 +2,7 @@
 import { cartSubtotalCents, cartSubtotalsByCategory, isMerchantKey, isProductCategoryKey, isSubtypeOf, type CartItem } from '@rethink/shared';
 import { adminClient } from '../_shared/env.ts';
 import { resolveCaller } from '../_shared/auth.ts';
+import { maybeAlertOnCart } from '../_shared/cart-alert.ts';
 import { emitEvent } from '../_shared/events.ts';
 import { handle, HttpError, json, optionalIso, readJson, requireString, requireUuid } from '../_shared/http.ts';
 import { sha256Hex } from '../_shared/tokens.ts';
@@ -121,5 +122,12 @@ Deno.serve(handle(async (req) => {
     occurredAt: observedAt,
   });
 
-  return json({ cartId, version: nextVersion, subtotalCents, byCategory, fingerprint, eventRecorded: emitted.inserted });
+  // The cross-device moment: a cart built in the browser that crosses a budget buzzes the phone.
+  // Quiet when the cart fits, and quiet on a repeat of an event we already handled.
+  const alert =
+    emitted.inserted && items.length > 0
+      ? await maybeAlertOnCart(admin, caller.ownerId, emitted.id, { merchantKey, byCategory, cartId })
+      : { pushed: false, reason: 'duplicate-event' as const };
+
+  return json({ cartId, version: nextVersion, subtotalCents, byCategory, fingerprint, eventRecorded: emitted.inserted, alert });
 }));

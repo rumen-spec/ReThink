@@ -1,23 +1,24 @@
 /**
- * Home (SPEC §5.5) in the Sleek twist: hero → one state line → cart row → Future Me inline
- * (hold-to-scrub graph + pencil to the Edit page) → two pressing budgets → activity. Coral on exactly
- * one element besides the graph's scenario path. All money from @rethink/shared.
+ * Home (SPEC §5.5): one loud number → the cart → the two most pressing budgets, side by side →
+ * Future Me. Nothing explains itself in a sentence: a budget the cart pushes over turns coral, and
+ * the graph grows a coral path. All money from @rethink/shared.
  */
-import { cartSubtotalsByCategory, computeBudgetConsequence, findBudgetCategoryFor, formatCad, getProductCategory, isProductCategoryKey, sortPressingBudgets } from '@rethink/shared';
+import { cartSubtotalsByCategory, computeBudgetConsequence, findBudgetCategoryFor, formatCad, isProductCategoryKey, sortPressingBudgets } from '@rethink/shared';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { BudgetRow } from '@/components/budget-row';
+import { BudgetCard } from '@/components/budget-card';
 import { CartRow } from '@/components/cart-row';
 import { FutureMe } from '@/components/future-me';
 import { Hero } from '@/components/hero';
 import { Button } from '@/components/ui/button';
 import { SectionHeader } from '@/components/ui/section';
-import { Divider, Surface } from '@/components/ui/surface';
+import { Surface } from '@/components/ui/surface';
 import { Body, Caption, Title } from '@/components/ui/text';
-import { BottomTabInset, Spacing, T } from '@/constants/theme';
+// Caption still carries the sync status in the header.
+import { BottomTabInset, Spacing, T, Type } from '@/constants/theme';
 import { useOwnerActions, useOwnerState } from '@/lib/owner-state';
 
 export default function HomeScreen() {
@@ -45,16 +46,7 @@ export default function HomeScreen() {
     }
     return { over: worst, overageCents: total };
   }, [byCategory, enabled]);
-  const unbudgeted = Object.keys(byCategory).filter(isProductCategoryKey).filter((k) => !findBudgetCategoryFor(enabled, k));
-
   const availableCents = enabled.reduce((n, c) => n + Math.max(0, c.allocatedCents - c.confirmedSpentCents), 0);
-  const state = !s.cart
-    ? { text: 'Nothing in your cart right now.', tone: 'muted' as const }
-    : over
-      ? { text: `Your cart would put ${over.name} ${formatCad(over.overCents)} over.`, tone: 'over' as const }
-      : unbudgeted.length
-        ? { text: `Set a ${getProductCategory(unbudgeted[0]!).label} budget to see this cart's impact.`, tone: 'muted' as const }
-        : { text: 'Your cart fits your budgets.', tone: 'good' as const };
 
   const pressing = sortPressingBudgets(enabled);
   const rows = showAll ? pressing : pressing.slice(0, 2);
@@ -64,7 +56,7 @@ export default function HomeScreen() {
     <SafeAreaView style={st.safe} edges={['top']}>
       <ScrollView contentContainerStyle={st.content}>
         <View style={st.header}>
-          <Title>Hey, {s.displayName ?? '…'}</Title>
+          <Title style={st.greeting}>Hey, {s.displayName ?? '…'}</Title>
           <Caption>
             {sync}
             {s.syncedAt ? ` · ${s.syncedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}
@@ -91,49 +83,38 @@ export default function HomeScreen() {
           </Surface>
         ) : null}
 
-        {s.periodId ? <Hero label="Available this month" value={formatCad(availableCents)} state={state.text} tone={state.tone} /> : null}
+        {s.periodId ? <Hero label="Available this month" value={formatCad(availableCents)} /> : null}
 
         {s.cart ? <CartRow cart={s.cart} /> : null}
 
-        {s.savingsPlan ? (
-          <View style={st.section}>
-            <SectionHeader title="Future Me" />
-            <Surface tone="high">
-              <FutureMe
-                openingBalanceCents={s.savingsPlan.openingBalanceCents}
-                planContributionCents={s.savingsPlan.monthlyContributionCents}
-                overageCents={overageCents}
-                overName={over?.name ?? null}
-                onEdit={() => router.push('/edit')}
-              />
-            </Surface>
-          </View>
-        ) : null}
-
         {pressing.length > 0 ? (
           <View style={st.section}>
-            <SectionHeader title="Budgets" action={{ label: showAll ? 'Fewer' : `All ${pressing.length}`, onPress: () => setShowAll((v) => !v) }} />
-            <Surface inset>
-              {rows.map((c, i) => (
-                <View key={c.id}>
-                  {i > 0 ? <Divider /> : null}
-                  <BudgetRow category={c} proposedCents={proposedFor(c.productCategory)} coral={false} />
-                </View>
+            <SectionHeader
+              title="Budgets"
+              action={pressing.length > 2 ? { label: showAll ? 'Fewer' : `All ${pressing.length}`, onPress: () => setShowAll((v) => !v) } : undefined}
+              onPress={() => router.push('/edit')}
+              accessibilityLabel="Edit budgets"
+            />
+            <View style={st.grid}>
+              {rows.map((c) => (
+                <BudgetCard key={c.id} category={c} proposedCents={proposedFor(c.productCategory)} />
               ))}
-            </Surface>
+            </View>
           </View>
         ) : null}
 
-        {s.notes.length > 0 ? (
-          <View style={st.section}>
-            <SectionHeader title="Activity" />
-            <Surface>
-              {s.notes.slice(0, 3).map((n, i) => (
-                <Caption key={i}>{n}</Caption>
-              ))}
-            </Surface>
-          </View>
+        {s.savingsPlan ? (
+          <Surface tone="high">
+            <FutureMe
+              openingBalanceCents={s.savingsPlan.openingBalanceCents}
+              planContributionCents={s.savingsPlan.monthlyContributionCents}
+              overageCents={overageCents}
+              overName={over?.name ?? null}
+              onEdit={() => router.push('/edit')}
+            />
+          </Surface>
         ) : null}
+
       </ScrollView>
     </SafeAreaView>
   );
@@ -143,5 +124,8 @@ const st = StyleSheet.create({
   safe: { flex: 1, backgroundColor: T.canvas },
   content: { paddingHorizontal: Spacing.gutter, paddingTop: Spacing.two, gap: Spacing.six, paddingBottom: BottomTabInset + Spacing.five },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
+  // Bigger than a section title, still well clear of the 48pt figure below it.
+  greeting: { fontSize: Type.greeting, lineHeight: 36, letterSpacing: -0.3 },
   section: { gap: Spacing.three },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.three },
 });

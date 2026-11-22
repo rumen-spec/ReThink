@@ -73,7 +73,7 @@ export const Elevation = {
   ],
 } as const;
 
-export const Type = { hero: 48, title: 22, body: 17, secondary: 15, caption: 13 } as const;
+export const Type = { hero: 48, greeting: 30, title: 22, body: 17, secondary: 15, caption: 13 } as const;
 
 export const Radius = { surface: 22, control: 12, pill: 999 } as const;
 

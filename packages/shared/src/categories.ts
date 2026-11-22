@@ -163,6 +163,35 @@ export function findBudgetCategoryFor(
 }
 
 /** Series colour for a budget: its product category's colour, or muted ink for dashboard-only budgets. */
-export function colorForBudget(category: Pick<BudgetCategory, 'productCategory'>, mode: 'dark' | 'light' = 'dark'): string {
-  return category.productCategory ? getProductCategory(category.productCategory).color[mode] : getProductCategory('other').color[mode];
+/**
+ * Colours for budgets that route no products — Food, Transport, anything the user adds by hand.
+ * They are real categories to the person using the app, so they get real colours; only `other`,
+ * the catch-all a product falls into when nothing fits, stays deliberately grey.
+ *
+ * Validated 2026-11-22 against the five product-category colours and coral: worst normal-vision
+ * ΔE 13.4 and worst colour-blind ΔE 8.2, both clear of the floors, and ≥ 3:1 on the card.
+ */
+export const EXTRA_BUDGET_COLORS = [
+  { dark: '#924BAC', light: '#7B3C92' }, // orchid
+  { dark: '#A85237', light: '#8E4229' }, // rust
+] as const;
+
+/** Stable small hash, so a budget keeps its colour between launches and across devices. */
+function hashName(name: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < name.length; i++) {
+    h ^= name.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return Math.abs(h);
+}
+
+/**
+ * The colour that identifies a budget: its product category's, or one of the extra colours picked
+ * deterministically from the name. `other` and nameless budgets fall back to muted ink.
+ */
+export function colorForBudget(category: Pick<BudgetCategory, 'productCategory'> & { name?: string }, mode: 'dark' | 'light' = 'dark'): string {
+  if (category.productCategory) return getProductCategory(category.productCategory).color[mode];
+  if (!category.name) return getProductCategory('other').color[mode];
+  return EXTRA_BUDGET_COLORS[hashName(category.name) % EXTRA_BUDGET_COLORS.length]![mode];
 }

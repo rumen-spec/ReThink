@@ -13,6 +13,8 @@ const l = log.child('overlay');
 export type OverlayState =
   | { kind: 'hidden' }
   | { kind: 'unpaired' }
+  /** Off a product page, but this store's cart has something in it. */
+  | { kind: 'cart'; merchantLabel: string; itemCount: number; subtotalText: string; line: string; over: boolean }
   | { kind: 'wrong-currency'; currency: string }
   | { kind: 'no-budget'; categoryLabel: string }
   | { kind: 'no-price'; categoryLabel: string }
@@ -150,6 +152,17 @@ export function mountOverlay(): OverlayHandle {
           wrap.append(cat);
           wrap.append(el('div', 'headline', `No ${state.categoryLabel} budget`));
           wrap.append(el('div', 'line muted', `Add one on your phone and this will show what the purchase does to it.`));
+          break;
+        }
+        case 'cart': {
+          const cat = el('div', 'cat');
+          const dot = el('span', 'dot');
+          dot.style.background = categoryColor;
+          cat.append(dot, el('span', undefined, `${state.merchantLabel} · ${state.itemCount} ${state.itemCount === 1 ? 'item' : 'items'}`));
+          wrap.append(cat);
+          wrap.append(el('div', 'headline', state.subtotalText));
+          wrap.append(el('div', `line ${state.over ? 'over' : 'muted'}`, state.line));
+          wrap.append(el('div', 'foot', 'Mirrored to your phone. Nothing is recorded as spent until you say you bought it.'));
           break;
         }
         case 'no-price': {

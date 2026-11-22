@@ -28,7 +28,6 @@ export function CartRow({ cart, onPress }: { cart: ActiveCart; onPress?: () => v
       </View>
       <View style={s.right}>
         <Money>{cart.subtotalCents === null ? 'Partial' : formatCad(cart.subtotalCents)}</Money>
-        <Caption>v{cart.version}</Caption>
       </View>
     </Surface>
   );

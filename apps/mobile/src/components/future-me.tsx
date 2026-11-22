@@ -91,7 +91,8 @@ export function FutureMe({
         {showScenario ? (
           <View style={s.right}>
             <Caption>If bought</Caption>
-            <Money color={T.coral}>{formatCad(at.scenarioCents)}</Money>
+            {/* The cost, not the balance: what this purchase takes off Future Me, shown negative. */}
+            <Money color={T.coral}>{formatCad(at.scenarioCents - at.plannedCents)}</Money>
           </View>
         ) : null}
       </View>

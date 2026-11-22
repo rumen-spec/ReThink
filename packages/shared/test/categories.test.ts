@@ -4,6 +4,7 @@ import {
   PRODUCT_CATEGORIES,
   PRODUCT_CATEGORY_KEYS,
   colorForBudget,
+  EXTRA_BUDGET_COLORS,
   findBudgetCategoryFor,
   getProductCategory,
   isProductCategoryKey,
@@ -38,7 +39,23 @@ describe('PRODUCT_CATEGORIES registry', () => {
     }
     expect(getProductCategory('other').color.dark).toBe('#8FA09B');
     expect(colorForBudget({ productCategory: 'beauty' })).toBe('#D55181');
-    expect(colorForBudget({ productCategory: undefined })).toBe('#8FA09B'); // Food / Transport
+    // Only the catch-all is grey; a budget with no product category still gets a real colour.
+    expect(colorForBudget({ productCategory: 'other' })).toBe('#8FA09B');
+    expect(colorForBudget({ productCategory: undefined })).toBe('#8FA09B'); // nothing to key off
+  });
+
+  it('gives product-less budgets a stable colour from the extra palette', () => {
+    const food = colorForBudget({ productCategory: undefined, name: 'Food' });
+    const transport = colorForBudget({ productCategory: undefined, name: 'Transport' });
+    for (const c of [food, transport]) {
+      expect(EXTRA_BUDGET_COLORS.some((e) => e.dark === c)).toBe(true);
+      expect(c).not.toBe('#8FA09B');
+    }
+    // Same name, same colour, every launch and every device.
+    expect(colorForBudget({ productCategory: undefined, name: 'Food' })).toBe(food);
+    expect(colorForBudget({ productCategory: undefined, name: 'Food' }, 'light')).toBe(EXTRA_BUDGET_COLORS.find((e) => e.dark === food)!.light);
+    // A product category always wins over the name.
+    expect(colorForBudget({ productCategory: 'clothing', name: 'Food' })).toBe('#9085E9');
   });
   it('demo keys are a subset of the registry', () => {
     for (const k of DEMO_PRODUCT_CATEGORY_KEYS) expect(PRODUCT_CATEGORY_KEYS).toContain(k);

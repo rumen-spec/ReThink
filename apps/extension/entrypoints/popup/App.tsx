@@ -281,7 +281,7 @@ export default function App() {
         <button className="btn" onClick={() => void clearPairing()}>
           Unpair this browser
         </button>
-        <span className="meta">{status || (cart ? `cart v${cart.version}` : 'watching')}</span>
+        <span className="meta">{status}</span>
       </footer>
     </main>
   );
