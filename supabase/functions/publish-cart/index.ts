@@ -104,7 +104,8 @@ Deno.serve(handle(async (req) => {
     fingerprint,
     version: nextVersion,
     observed_at: observedAt,
-    archived_at: null,
+    // An empty cart is "no cart": archive it so Home shows nothing rather than "0 items".
+    archived_at: items.length === 0 ? new Date().toISOString() : null,
   };
   const { error } = await admin.from('cart_snapshots').upsert(row, { onConflict: 'owner_id,merchant_key,device_id,session_id' });
   if (error) throw error;

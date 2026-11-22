@@ -11,7 +11,7 @@ npm workspaces, TypeScript everywhere.
 - Tests live in a `test/` folder beside `src/` in every workspace (`packages/shared/test/*.test.ts`, `apps/*/test/`), never co-located in `src/`. Import the unit under test as `../src/<file>.ts`.
 
 ## Rules that are easy to break
-- UI is dark-first (deep charcoal-teal canvas, never pure `#000`). Tokens are in `docs/PLAN.md` Block 4 until the apps own them.
+- UI is dark-first and **neutral**: charcoal canvas, never pure `#000`, and **no teal or other accent hue anywhere** (dropped 2026-11-22). The accent is the type itself (ink), and **coral appears on exactly one element per screen**: the thing that is over budget. Category colours are data (dots, bars, the cart avatar), never chrome or status. One system typeface. **Boxes are elevated, controls are flat**: a surface is the canvas lifted, with a lit top edge and a shadow pair, no outline; buttons, chips, inputs and bars are solid fills with no shadow, because a shadowed control is hard to see. Tokens live in `apps/mobile/src/constants/theme.ts` (`T`, `Fill`, `Elevation`), mirrored in `docs/PLAN.md` Block 4 — that pair is the source of truth. **The `sleek` and `immersive` skills are retired; don't apply either.**
 - Money is integer CAD cents end to end. Format only at the UI edge with `formatCad`. Unknown price is `null`, never `0`.
 - Finance math lives only in `packages/shared`. Never re-derive remaining/overage/forecast inside an app.
 - Viewing a product or observing a cart never changes confirmed spending. Only a `PURCHASE_CONFIRMED` event with a unique confirmation key does.

@@ -6,11 +6,16 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "rethink",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
     "ios": {
       "icon": "./assets/expo.icon",
       "bundleIdentifier": "com.rethink.mobile",
-      "supportsTablet": false
+      "supportsTablet": false,
+      "userInterfaceStyle": "dark",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIBackgroundModes": ["location", "remote-notification"]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -31,9 +36,24 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#141719",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "ReThink checks whether you have arrived at a place you asked it to watch, like a mall. It never tracks where you are the rest of the time.",
+          "locationAlwaysAndWhenInUsePermission": "ReThink watches only the few places you add yourself, so it can remind you about your budget as you walk in. Your location is never stored or shared.",
+          "isIosBackgroundLocationEnabled": true
+        }
+      ],
+      "expo-task-manager",
+      [
+        "expo-notifications",
+        {
+          "color": "#F0F2F3"
         }
       ]
     ],

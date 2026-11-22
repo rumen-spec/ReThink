@@ -6,7 +6,11 @@ import type { BudgetCategory } from './types.ts';
  * Adding a category = adding one entry here (and a row in the `product_categories` lookup table,
  * seeded from this list). Everything else derives from it: the `ProductCategoryKey` / subtype
  * types, the Gemini prompt (keys + subtypes + scope line), the deterministic classifier's
- * keyword pass, onboarding's suggested categories and the extension's routing.
+ * keyword pass, onboarding's suggested categories, the extension's routing and the UI colours.
+ *
+ * Array order = display order (capsules, legends, stacked bars). It was chosen so that adjacent
+ * colours stay separable for colour-blind readers (validated 2026-11-21, see DESIGN.md).
+ * Budgets with no product category (Food, Transport) render in muted ink like `other`.
  *
  * Demo scope (2026-11-21): only `clothing` and `beauty` are exercised live. The rest prove the
  * design is general; a product that classifies to one without an enabled budget gets a
@@ -26,6 +30,12 @@ export interface ProductCategoryDef {
    * product_type, tags, breadcrumbs and title. A hit is a prior, not a verdict.
    */
   readonly keywords: readonly string[];
+  /**
+   * Validated series colours (.agents/skills/immersive/DESIGN.md → Categories). Used for the
+   * geometric block behind a category card, its progress bar and chart marks. Never for status,
+   * and never alone: the category name always sits beside it.
+   */
+  readonly color: { readonly dark: string; readonly light: string };
 }
 
 export const PRODUCT_CATEGORIES = [
@@ -40,6 +50,7 @@ export const PRODUCT_CATEGORIES = [
       'sneaker', 'shoe', 'boot', 'sock', 'hat', 'cap', 'beanie', 'belt', 'bra', 'underwear', 'boxer',
       'apparel', 'womens', 'mens', 'outerwear', 'footwear',
     ],
+    color: { dark: '#9085E9', light: '#6250D6' },
   },
   {
     key: 'beauty',
@@ -52,17 +63,7 @@ export const PRODUCT_CATEGORIES = [
       'shampoo', 'conditioner', 'hair', 'fragrance', 'perfume', 'cologne', 'bath', 'body', 'balm',
       'brush', 'sponge', 'cosmetic', 'cosmetics',
     ],
-  },
-  {
-    key: 'electronics',
-    label: 'Electronics',
-    subtypes: ['audio', 'phone', 'computing', 'wearable', 'accessories', 'other'],
-    scope: 'Consumer electronics and their accessories: headphones, speakers, phones, cases, chargers, cables, laptops, tablets, wearables.',
-    keywords: [
-      'headphone', 'headphones', 'earbud', 'earbuds', 'speaker', 'phone', 'iphone', 'case', 'charger',
-      'cable', 'power bank', 'laptop', 'tablet', 'keyboard', 'mouse', 'monitor', 'watch', 'camera',
-      'electronics', 'tech',
-    ],
+    color: { dark: '#D55181', light: '#E87BA4' },
   },
   {
     key: 'home',
@@ -74,6 +75,19 @@ export const PRODUCT_CATEGORIES = [
       'mug', 'kettle', 'pan', 'knife', 'plate', 'bowl', 'glassware', 'duvet', 'pillow', 'sheet',
       'blanket', 'towel', 'home', 'decor', 'kitchen', 'furniture',
     ],
+    color: { dark: '#0CA30C', light: '#008300' },
+  },
+  {
+    key: 'electronics',
+    label: 'Electronics',
+    subtypes: ['audio', 'phone', 'computing', 'wearable', 'accessories', 'other'],
+    scope: 'Consumer electronics and their accessories: headphones, speakers, phones, cases, chargers, cables, laptops, tablets, wearables.',
+    keywords: [
+      'headphone', 'headphones', 'earbud', 'earbuds', 'speaker', 'phone', 'iphone', 'case', 'charger',
+      'cable', 'power bank', 'laptop', 'tablet', 'keyboard', 'mouse', 'monitor', 'watch', 'camera',
+      'electronics', 'tech',
+    ],
+    color: { dark: '#3987E5', light: '#2A78D6' },
   },
   {
     key: 'entertainment',
@@ -84,6 +98,7 @@ export const PRODUCT_CATEGORIES = [
       'book', 'novel', 'paperback', 'hardcover', 'game', 'games', 'console', 'controller', 'vinyl',
       'record', 'album', 'cd', 'puzzle', 'board game', 'lego', 'collectible', 'figure', 'poster',
     ],
+    color: { dark: '#C98500', light: '#EDA100' },
   },
   {
     // The catch-all. A cart line is never uncategorised: merch, keychains, gift cards land here and
@@ -93,6 +108,7 @@ export const PRODUCT_CATEGORIES = [
     subtypes: ['other'],
     scope: 'A real product that fits none of the categories above (merch, keychains, gift cards, stationery).',
     keywords: [],
+    color: { dark: '#8FA09B', light: '#66787D' }, // muted ink: deliberately neutral, the fold slot
   },
 ] as const satisfies readonly ProductCategoryDef[];
 
@@ -144,4 +160,9 @@ export function findBudgetCategoryFor(
   key: ProductCategoryKey,
 ): BudgetCategory | null {
   return categories.find((c) => c.enabled && c.productCategory === key) ?? null;
+}
+
+/** Series colour for a budget: its product category's colour, or muted ink for dashboard-only budgets. */
+export function colorForBudget(category: Pick<BudgetCategory, 'productCategory'>, mode: 'dark' | 'light' = 'dark'): string {
+  return category.productCategory ? getProductCategory(category.productCategory).color[mode] : getProductCategory('other').color[mode];
 }

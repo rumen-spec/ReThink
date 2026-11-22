@@ -1,42 +1,117 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+/**
+ * Popup styling. Same system as the phone (apps/mobile/src/constants/theme.ts, mirrored in
+ * docs/PLAN.md Block 4): neutral charcoal, no accent hue, coral only on the thing that is over
+ * budget. Cards are the canvas lifted — gradient face, key + contact + rim shadows, a bevelled lip,
+ * no outline. Controls are flat and solid so they stay easy to see.
+ */
+:root {
+  --canvas: #141719;
+  --box-top: #1c2023;
+  --box-bottom: #0e1012;
+  --control: #272b30;
+  --field: #0a0c0d;
+  --hairline: #2c3136;
+  --ink: #f0f2f3;
+  --muted: #9aa1a7;
+  --coral: #f07a74;
+  --coral-tint: #3a1f1e;
+  --lift: 2px 18px 34px rgba(0, 0, 0, 0.55), 0 5px 10px rgba(0, 0, 0, 0.4),
+    -10px -11px 26px rgba(255, 255, 255, 0.05), inset 0 1px 1px rgba(255, 255, 255, 0.09),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.55);
+  color-scheme: dark;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
+.panel {
+  width: 360px;
+  padding: 18px 18px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 20px;
 }
-.logo:hover {
-  filter: drop-shadow(0 0 2em #54bc4ae0);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
-}
+h1 { margin: 0; font-size: 22px; font-weight: 600; line-height: 28px; }
+.h2 { font-size: 17px; font-weight: 600; line-height: 22px; }
+.body { font-size: 15px; }
+.meta { color: var(--muted); font-size: 13px; line-height: 18px; }
+.label { color: var(--muted); font-size: 13px; }
+.money { font-variant-numeric: tabular-nums; font-weight: 600; font-size: 15px; }
+.row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.qty { display: inline-flex; align-items: center; gap: 8px; }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
-}
-
+/* A card is the canvas, lifted: shadow does the work, no border. */
 .card {
-  padding: 2em;
+  position: relative;
+  background: linear-gradient(160deg, var(--box-top), var(--box-bottom));
+  border: 0;
+  border-radius: 20px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: var(--lift);
 }
+/* Within budget needs no colour at all; only the over case is marked. */
+.card.good { box-shadow: var(--lift); }
+.card.over { color: var(--ink); }
+.card.over .money { color: var(--coral); }
 
-.read-the-docs {
-  color: #888;
+/**
+ * Category tags. Not a card and not the point of the panel: a quiet strip at the bottom saying
+ * which budgets this cart touches and where it would land. Outlined in the category's own colour;
+ * coral outline is the only status colour and means this cart puts that budget over.
+ */
+.tags { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 2px; }
+.tag {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  border: 1px solid var(--edge, var(--hairline));
+  border-radius: 999px;
+  padding: 5px 11px;
+  font-size: 13px;
+  line-height: 18px;
+}
+.tag .v { color: var(--muted); font-variant-numeric: tabular-nums; }
+.tag.over { border-color: var(--coral); }
+.tag.over .v { color: var(--coral); font-weight: 600; }
+.tag.none { border-style: dashed; }
+
+.input {
+  background: var(--field);
+  color: var(--ink);
+  border: 0;
+  border-radius: 12px;
+  padding: 11px 13px;
+  font-size: 15px;
+  font-family: inherit;
+  min-height: 42px;
+}
+.input.code { font-size: 24px; letter-spacing: 6px; text-transform: uppercase; font-variant-numeric: tabular-nums; }
+.input::placeholder { color: var(--muted); }
+.input:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+.btn {
+  background: var(--control);
+  color: var(--ink);
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 18px;
+  min-height: 42px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 120ms;
+}
+.btn.primary { background: var(--ink); color: var(--canvas); }
+.btn.small { padding: 5px 14px; min-height: 34px; font-size: 14px; }
+.btn:hover:not(:disabled) { opacity: 0.82; }
+.btn:active:not(:disabled) { opacity: 0.7; }
+.btn:disabled { opacity: 0.45; cursor: default; }
+.btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .btn { transition: none; }
 }

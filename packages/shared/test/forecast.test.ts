@@ -5,7 +5,7 @@ import { FIXTURE_SAVINGS_PLAN } from '../src/fixtures.ts';
 const base = {
   openingBalanceCents: FIXTURE_SAVINGS_PLAN.openingBalanceCents,
   monthlyContributionCents: FIXTURE_SAVINGS_PLAN.monthlyContributionCents,
-  annualRate: FIXTURE_SAVINGS_PLAN.illustrativeRateAnnual,
+  annualRate: 0 as const, // the fixture's rate is a UI default; the arithmetic tests pin 0%
   horizonMonths: FIXTURE_SAVINGS_PLAN.horizonMonths,
 };
 
@@ -69,6 +69,19 @@ describe('projectSavings', () => {
     expect(r.uncoveredOverageCents).toBe(8_300);
   });
 
+  it("recurrence 'monthly' reduces every contribution: 0% rate, 12 months → delta = 12 × 8_300", () => {
+    const r = projectSavings({ ...base, horizonMonths: 12, overageFundedFromSavingsCents: 8_300, overageRecurrence: 'monthly' });
+    expect(r.recurrence).toBe('monthly');
+    expect(r.deltaAtHorizonCents).toBe(12 * 8_300);
+    for (const p of r.points.slice(1)) expect(p.plannedCents - p.scenarioCents).toBe(p.month * 8_300);
+  });
+  it("recurrence 'monthly' at 10% over 15 years with $83/mo overspend is a five-figure gap (the habit framing)", () => {
+    const r = projectSavings({ ...base, annualRate: 0.1, horizonMonths: 180, overageFundedFromSavingsCents: 8_300, overageRecurrence: 'monthly' });
+    expect(r.deltaAtHorizonCents).toBeGreaterThan(3_000_000); // > $30k
+    expect(r.deltaAtHorizonCents).toBeLessThan(4_000_000);
+    const once = projectSavings({ ...base, annualRate: 0.1, horizonMonths: 180, overageFundedFromSavingsCents: 8_300 });
+    expect(once.deltaAtHorizonCents).toBeLessThan(50_000); // one-time: a few hundred dollars
+  });
   it('rejects non-cent and negative inputs', () => {
     expect(() => projectSavings({ ...base, monthlyContributionCents: 300.5 })).toThrow(TypeError);
     expect(() => projectSavings({ ...base, monthlyContributionCents: -1 })).toThrow(RangeError);

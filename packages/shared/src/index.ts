@@ -5,5 +5,7 @@ export * from './categories.ts';
 export * from './merchants.ts';
 export * from './money.ts';
 export * from './budget.ts';
+export * from './classify.ts';
 export * from './forecast.ts';
 export * from './fixtures.ts';
+export * from './log.ts';

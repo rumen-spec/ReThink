@@ -3,6 +3,7 @@ import {
   DEMO_PRODUCT_CATEGORY_KEYS,
   PRODUCT_CATEGORIES,
   PRODUCT_CATEGORY_KEYS,
+  colorForBudget,
   findBudgetCategoryFor,
   getProductCategory,
   isProductCategoryKey,
@@ -11,9 +12,10 @@ import {
 import { FIXTURE_CATEGORIES } from '../src/fixtures.ts';
 
 describe('PRODUCT_CATEGORIES registry', () => {
-  it('has six categories (five real + other) with unique lowercase keys', () => {
-    expect(PRODUCT_CATEGORIES).toHaveLength(6);
-    expect(PRODUCT_CATEGORIES.at(-1)!.key).toBe('other');
+  it('has six categories in the validated display order', () => {
+    expect(PRODUCT_CATEGORIES.map((c) => c.key)).toEqual([
+      'clothing', 'beauty', 'home', 'electronics', 'entertainment', 'other',
+    ]);
     const keys = PRODUCT_CATEGORIES.map((c) => c.key);
     expect(new Set(keys).size).toBe(keys.length);
     for (const k of keys) expect(k).toMatch(/^[a-z][a-z-]*$/);
@@ -26,6 +28,17 @@ describe('PRODUCT_CATEGORIES registry', () => {
       expect(c.subtypes.at(-1)).toBe('other');
       expect(new Set(c.subtypes).size).toBe(c.subtypes.length);
     }
+  });
+  it('every category has distinct dark and light hex colours; other is muted ink', () => {
+    const darks = PRODUCT_CATEGORIES.map((c) => c.color.dark);
+    expect(new Set(darks).size).toBe(darks.length);
+    for (const c of PRODUCT_CATEGORIES) {
+      expect(c.color.dark).toMatch(/^#[0-9A-F]{6}$/);
+      expect(c.color.light).toMatch(/^#[0-9A-F]{6}$/);
+    }
+    expect(getProductCategory('other').color.dark).toBe('#8FA09B');
+    expect(colorForBudget({ productCategory: 'beauty' })).toBe('#D55181');
+    expect(colorForBudget({ productCategory: undefined })).toBe('#8FA09B'); // Food / Transport
   });
   it('demo keys are a subset of the registry', () => {
     for (const k of DEMO_PRODUCT_CATEGORY_KEYS) expect(PRODUCT_CATEGORY_KEYS).toContain(k);
