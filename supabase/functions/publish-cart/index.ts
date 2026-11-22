@@ -124,10 +124,18 @@ Deno.serve(handle(async (req) => {
 
   // The cross-device moment: a cart built in the browser that crosses a budget buzzes the phone.
   // Quiet when the cart fits, and quiet on a repeat of an event we already handled.
-  const alert =
-    emitted.inserted && items.length > 0
-      ? await maybeAlertOnCart(admin, caller.ownerId, emitted.id, { merchantKey, byCategory, cartId })
-      : { pushed: false, reason: 'duplicate-event' as const };
+  //
+  // Never fatal. The cart is already stored and the phone is already updating over realtime; a push
+  // that cannot be worked out or sent must not fail the publish and break the mirror.
+  let alert: Awaited<ReturnType<typeof maybeAlertOnCart>> = { pushed: false, reason: 'duplicate-event' };
+  if (emitted.inserted && items.length > 0) {
+    try {
+      alert = await maybeAlertOnCart(admin, caller.ownerId, emitted.id, { merchantKey, byCategory, cartId });
+    } catch (e) {
+      console.error('cart alert failed; cart publish continues', e);
+      alert = { pushed: false };
+    }
+  }
 
   return json({ cartId, version: nextVersion, subtotalCents, byCategory, fingerprint, eventRecorded: emitted.inserted, alert });
 }));

@@ -20,8 +20,9 @@ import { SectionHeader } from '@/components/ui/section';
 import { Divider, Surface } from '@/components/ui/surface';
 import { Body, Caption, Secondary, Title } from '@/components/ui/text';
 import { BottomTabInset, Radius, Spacing, T } from '@/constants/theme';
-import { locateMe, permissionState, syncGeofences, type GeofenceState } from '@/lib/geofence';
-import { useOwnerActions, useOwnerState } from '@/lib/owner-state';
+import { locateMe, permissionState, reportEntry, syncGeofences, type GeofenceState } from '@/lib/geofence';
+import { useOwnerActions, useOwnerState, type Hotspot } from '@/lib/owner-state';
+import { clearTriggerPairing, getTriggerPairing, pairAsTrigger, triggerHotspots, type TriggerPairing } from '@/lib/trigger';
 
 const RADII = [100, 250, 500];
 /** Where the pin lands when the map has never been moved and there is nothing to centre on. */
@@ -42,6 +43,10 @@ export default function HotspotsScreen() {
   const [radius, setRadius] = useState(250);
   /** The system draws the blue dot only once foreground permission is in hand. */
   const [showUser, setShowUser] = useState(false);
+  /** Set when this phone is acting as someone else's trigger: it watches their places, not its own. */
+  const [trigger, setTrigger] = useState<TriggerPairing | null>(null);
+  const [triggerSpots, setTriggerSpots] = useState<Hotspot[]>([]);
+  const [code, setCode] = useState('');
 
   const run = async (key: string, fn: () => Promise<string | void>) => {
     setBusy(key);
@@ -55,10 +60,31 @@ export default function HotspotsScreen() {
     }
   };
 
+  /** In trigger mode the fences come from the owner's account, read with the device token. */
+  const loadTrigger = useCallback(async (p: TriggerPairing) => {
+    const spots = await triggerHotspots(p);
+    setTriggerSpots(
+      spots.map((h) => ({ id: h.id, name: h.name, latitude: h.latitude, longitude: h.longitude, radiusM: h.radius_m, enabled: true, verified: true, categoryId: null, lastEnteredAt: null })),
+    );
+  }, []);
+
+  useEffect(() => {
+    void getTriggerPairing().then((p) => {
+      setTrigger(p);
+      if (p) void loadTrigger(p).catch(() => undefined);
+    });
+  }, [loadTrigger]);
+
+  const watchedSpots = trigger ? triggerSpots : s.hotspots;
+
   const resync = useCallback(async () => {
-    if ((await permissionState()) !== 'granted') return;
-    setGeo(await syncGeofences(s.hotspots));
-  }, [s.hotspots]);
+    const state = await permissionState();
+    // Re-checked here, not only on mount: permission is usually granted on the Me tab, and the map
+    // would otherwise keep hiding the blue dot until the screen was rebuilt.
+    setShowUser(state !== 'denied');
+    if (state !== 'granted') return;
+    setGeo(await syncGeofences(watchedSpots));
+  }, [watchedSpots]);
 
   // Keep the registered fences in step with the list whenever it changes.
   useEffect(() => {
@@ -86,7 +112,7 @@ export default function HotspotsScreen() {
     setStatus('');
   };
 
-  const watched = s.hotspots.filter((h) => h.enabled && h.verified).length;
+  const watched = watchedSpots.filter((h) => h.enabled && h.verified).length;
   // The map gives up half its height while you are naming a place, so the form clears the keyboard.
   const mapHeight = placing ? Math.max(200, Math.round(height * 0.26)) : Math.max(320, Math.round(height * 0.5));
 
@@ -96,22 +122,27 @@ export default function HotspotsScreen() {
         <View style={st.header}>
           <View>
             <Title>Hotspots</Title>
-            <Caption>
-              {watched} watched{geo?.status === 'watching' ? ' · fences live' : ''}
+            <Caption color={geo?.status === 'off' && geo.reason === 'unsupported' ? T.coral : undefined}>
+              {trigger ? `Trigger for ${trigger.ownerDisplayName ?? 'another account'}` : `${watched} watched`}
+              {geo?.status === 'watching' ? ' · fences live' : ''}
+              {/* Simulators routinely refuse region monitoring; say so rather than look broken. */}
+              {geo?.status === 'off' && geo.reason === 'unsupported' ? ' · this device can’t watch places' : ''}
             </Caption>
           </View>
-          <Pressable
-            onPress={() => (placing ? setPlacing(null) : startPlacing())}
-            accessibilityRole="button"
-            accessibilityLabel={placing ? 'Cancel adding a place' : 'Add a place'}
-            hitSlop={8}
-            style={({ pressed }) => [st.plus, pressed ? st.pressed : null]}>
-            <SymbolView name={placing ? 'xmark' : 'plus'} size={17} tintColor={T.canvas} weight="semibold" />
-          </Pressable>
+          {trigger ? null : (
+            <Pressable
+              onPress={() => (placing ? setPlacing(null) : startPlacing())}
+              accessibilityRole="button"
+              accessibilityLabel={placing ? 'Cancel adding a place' : 'Add a place'}
+              hitSlop={8}
+              style={({ pressed }) => [st.plus, pressed ? st.pressed : null]}>
+              <SymbolView name={placing ? 'xmark' : 'plus'} size={17} tintColor={T.canvas} weight="semibold" />
+            </Pressable>
+          )}
         </View>
 
         <View>
-          <HotspotMap ref={map} hotspots={s.hotspots} height={mapHeight} placing={placing} onPlace={setPlacing} placingRadiusM={radius} showsUser={showUser} />
+          <HotspotMap ref={map} hotspots={watchedSpots} height={mapHeight} placing={placing} onPlace={setPlacing} placingRadiusM={radius} showsUser={showUser} />
           <Pressable onPress={() => void locate()} accessibilityRole="button" accessibilityLabel="Show where I am" hitSlop={8} style={({ pressed }) => [st.locate, pressed ? st.pressed : null]}>
             <SymbolView name="location.fill" size={16} tintColor={T.ink} weight="semibold" />
           </Pressable>
@@ -159,6 +190,50 @@ export default function HotspotsScreen() {
 
         {status ? <Secondary>{status}</Secondary> : null}
 
+        {trigger ? (
+          <View style={st.section}>
+            <SectionHeader title="Watching for them" />
+            <Surface inset>
+              {triggerSpots.length === 0 ? (
+                <View style={st.row}>
+                  <Secondary>No places shared with this trigger yet.</Secondary>
+                </View>
+              ) : null}
+              {triggerSpots.map((h, i) => (
+                <View key={h.id}>
+                  {i > 0 ? <Divider /> : null}
+                  <View style={st.row}>
+                    <View style={st.grow}>
+                      <Body>{h.name}</Body>
+                      <Secondary>{h.radiusM} m</Secondary>
+                    </View>
+                    <Button label="Simulate entry" small busy={busy === `sim-${h.id}`} onPress={() => run(`sim-${h.id}`, () => reportEntry(h.id, true).then(() => 'Reported'))} />
+                  </View>
+                </View>
+              ))}
+            </Surface>
+            <Secondary>
+              This phone only knows where these places are. It cannot see budgets, carts or spending, and {trigger.ownerDisplayName ?? 'the owner'} can revoke it at any time.
+            </Secondary>
+            <View style={st.actions}>
+              <Button
+                label="Stop being a trigger"
+                small
+                busy={busy === 'untrigger'}
+                onPress={() =>
+                  run('untrigger', async () => {
+                    await clearTriggerPairing();
+                    setTrigger(null);
+                    setTriggerSpots([]);
+                    return 'No longer a trigger';
+                  })
+                }
+              />
+            </View>
+          </View>
+        ) : null}
+
+        {trigger ? null : (
         <View style={st.section}>
           <SectionHeader title="Places" />
           <Surface inset>
@@ -196,35 +271,48 @@ export default function HotspotsScreen() {
             ))}
           </Surface>
         </View>
+        )}
 
-        {s.hotspotEvents.length > 0 ? (
+        {/* Pairing form: this phone becomes someone else's trigger, e.g. a simulator with spoofed GPS. */}
+        {trigger ? null : (
           <View style={st.section}>
-            <SectionHeader title="Recent entries" />
-            <Surface inset>
-              {s.hotspotEvents.map((e, i) => (
-                <View key={e.id}>
-                  {i > 0 ? <Divider /> : null}
-                  <View style={st.row}>
-                    <View style={st.grow}>
-                      <View style={st.titleRow}>
-                        <Body>{e.hotspotName}</Body>
-                        {e.isSimulated ? (
-                          <View style={st.tag}>
-                            <Caption color={T.coral}>SIMULATED</Caption>
-                          </View>
-                        ) : null}
-                      </View>
-                      <Secondary>
-                        {e.deviceLabel} · {new Date(e.occurredAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                        {e.suppressed ? ` · no alert (${e.suppressed})` : ''}
-                      </Secondary>
-                    </View>
-                  </View>
-                </View>
-              ))}
+            <SectionHeader title="Act as a trigger" />
+            <Surface>
+              <Secondary>Enter a trigger code from another phone to watch their places and tell them when you arrive.</Secondary>
+              <View style={st.actions}>
+                <TextInput
+                  value={code}
+                  onChangeText={(t) => setCode(t.toUpperCase())}
+                  placeholder="ABC234"
+                  placeholderTextColor={T.muted}
+                  maxLength={8}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  keyboardAppearance="dark"
+                  style={[st.input, st.code]}
+                  accessibilityLabel="Trigger pairing code"
+                />
+                <Button
+                  label="Pair"
+                  variant="primary"
+                  small
+                  disabled={code.trim().length < 6}
+                  busy={busy === 'pair'}
+                  onPress={() =>
+                    run('pair', async () => {
+                      const p = await pairAsTrigger(code);
+                      setTrigger(p);
+                      setCode('');
+                      await loadTrigger(p);
+                      return `Paired with ${p.ownerDisplayName ?? 'their account'}`;
+                    })
+                  }
+                />
+              </View>
             </Surface>
           </View>
-        ) : null}
+        )}
+
       </ScrollView>
     </SafeAreaView>
   );
@@ -244,4 +332,5 @@ const st = StyleSheet.create({
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   tag: { backgroundColor: T.coralTint, borderRadius: Radius.control, paddingHorizontal: 6, paddingVertical: 2 },
   input: { backgroundColor: T.field, borderRadius: Radius.control, paddingHorizontal: 12, minHeight: 42, color: T.ink, fontSize: 17 },
+  code: { flex: 1, letterSpacing: 4, fontWeight: '600', fontVariant: ['tabular-nums'] },
 });

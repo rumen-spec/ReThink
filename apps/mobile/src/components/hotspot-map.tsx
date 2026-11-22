@@ -145,8 +145,14 @@ export const HotspotMap = forwardRef<
         onPress={(e) => onPlace?.(e.nativeEvent.coordinate)}
         userInterfaceStyle="dark"
         showsUserLocation={showsUser}
+        // Every optional overlay off: the map is here to show the fences and nothing else.
         showsMyLocationButton={false}
         showsCompass={false}
+        showsScale={false}
+        showsTraffic={false}
+        showsBuildings={false}
+        showsIndoors={false}
+        showsIndoorLevelPicker={false}
         toolbarEnabled={false}
         pitchEnabled={false}
         rotateEnabled={false}

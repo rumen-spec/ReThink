@@ -12,6 +12,8 @@ import * as TaskManager from 'expo-task-manager';
 
 import { log } from '@/lib/log';
 import { callFunction, ensureSession } from '@/lib/supabase';
+import { getTriggerPairing, reportAsTrigger } from '@/lib/trigger';
+import { newEventId } from '@/lib/uuid';
 
 const l = log.child('geofence');
 
@@ -31,12 +33,18 @@ export interface HotspotRow {
   lastEnteredAt: string | null;
 }
 
-/** Tell the server we walked in. Never records spending; it only emits an event and may push. */
+/**
+ * Tell the server we walked in. Never records spending; it only emits an event and may push.
+ * A phone paired as someone else's trigger reports with its device token, so the alert lands on
+ * their phone rather than this one.
+ */
 export async function reportEntry(hotspotId: string, isSimulated: boolean): Promise<{ suppressed: string | null }> {
+  const asTrigger = await getTriggerPairing();
+  if (asTrigger) return reportAsTrigger(asTrigger, hotspotId, isSimulated);
   await ensureSession();
   return callFunction<{ suppressed: string | null }>('report-hotspot', {
     hotspotId,
-    eventId: crypto.randomUUID(),
+    eventId: newEventId(),
     occurredAt: new Date().toISOString(),
     isSimulated,
   });
@@ -127,11 +135,18 @@ export async function syncGeofences(hotspots: HotspotRow[]): Promise<GeofenceSta
   try {
     if (already) await Location.stopGeofencingAsync(GEOFENCE_TASK).catch(() => undefined);
     await Location.startGeofencingAsync(GEOFENCE_TASK, regions);
-    l.info('watching hotspots', { count: regions.length, ids: regions.map((r) => r.identifier.slice(0, 8)) });
+    l.info('watching hotspots', {
+      count: regions.length,
+      // Coordinates included so a rehearsal can drive a simulator across a real fence.
+      fences: regions.map((r) => `${r.identifier.slice(0, 8)}@${r.latitude.toFixed(5)},${r.longitude.toFixed(5)}/${r.radius}m`),
+    });
     return { status: 'watching', count: regions.length };
   } catch (e) {
     const detail = e instanceof Error ? e.message : String(e);
-    l.error('could not start geofencing', e);
+    // A device that cannot monitor regions is a fact about the device, not a failure of ours —
+    // iOS simulators commonly refuse. Logged as a warning so it never raises a red error overlay
+    // over the UI, and reported to the screen so it can say so plainly.
+    l.warn('geofencing unavailable on this device', { detail });
     return { status: 'off', reason: 'unsupported', detail };
   }
 }

@@ -103,6 +103,42 @@ export function computeBudgetConsequence(
   };
 }
 
+export interface MonthAvailable {
+  /** What is left across every enabled budget. Negative when the month as a whole is overspent. */
+  availableCents: Cents;
+  allocatedCents: Cents;
+  confirmedSpentCents: Cents;
+  /** How much of the overspend is dragging the total down, as a positive number. 0 when none. */
+  overspentCents: Cents;
+}
+
+/**
+ * The Home headline: what is left of the money you set aside this month (§5.5).
+ *
+ * Overspend subtracts. An earlier version floored each budget at zero so one blown budget could not
+ * "eat" another, which read as fair but made the headline lie in the user's favour — exactly the
+ * blind spot this product exists to remove. If Clothing is $40 over, that $40 is really gone, and
+ * the number says so. The per-budget cards still show which one it was.
+ *
+ * Only enabled budgets count, and only confirmed spending: a cart is never in here (§1.4).
+ */
+export function monthAvailable(categories: BudgetCategory[]): MonthAvailable {
+  let allocatedCents = 0;
+  let confirmedSpentCents = 0;
+  let overspentCents = 0;
+
+  for (const c of categories) {
+    if (!c.enabled) continue;
+    assertCents(c.allocatedCents, 'allocatedCents');
+    assertCents(c.confirmedSpentCents, 'confirmedSpentCents');
+    allocatedCents += c.allocatedCents;
+    confirmedSpentCents += c.confirmedSpentCents;
+    overspentCents += Math.max(0, c.confirmedSpentCents - c.allocatedCents);
+  }
+
+  return { availableCents: allocatedCents - confirmedSpentCents, allocatedCents, confirmedSpentCents, overspentCents };
+}
+
 /**
  * Order for the Home "pressing budgets" list (§5.5). Only enabled categories.
  * 1. Over budget (remaining < 0), most-over first.

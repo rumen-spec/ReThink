@@ -9,6 +9,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { ensureOwnerDevice } from '@/lib/device';
 import { log } from '@/lib/log';
 import { callFunction, ensureSession, supabase } from '@/lib/supabase';
+import { newEventId } from '@/lib/uuid';
 
 const l = log.child('owner-state');
 
@@ -332,7 +333,7 @@ export function useOwnerStateProvider(): { state: OwnerState; actions: OwnerActi
           throw new Error(error.message);
         }
         await supabase.from('spending_events').insert({
-          event_id: crypto.randomUUID(),
+          event_id: newEventId(),
           owner_id: uid,
           source: 'ios-owner',
           type: 'BUDGET_UPDATED',
@@ -353,7 +354,7 @@ export function useOwnerStateProvider(): { state: OwnerState; actions: OwnerActi
           throw new Error(error.code === '23505' ? 'Another budget already covers these products this month.' : error.message);
         }
         await supabase.from('spending_events').insert({
-          event_id: crypto.randomUUID(),
+          event_id: newEventId(),
           owner_id: uid,
           source: 'ios-owner',
           type: 'BUDGET_UPDATED',
@@ -434,7 +435,7 @@ export function useOwnerStateProvider(): { state: OwnerState; actions: OwnerActi
         try {
           const r = await callFunction<{ suppressed: string | null; message?: { title: string; body: string } }>('report-hotspot', {
             hotspotId,
-            eventId: crypto.randomUUID(),
+            eventId: newEventId(),
             occurredAt: new Date().toISOString(),
             isSimulated: simulated,
           });
@@ -461,7 +462,7 @@ export function useOwnerStateProvider(): { state: OwnerState; actions: OwnerActi
           throw new Error(error.message);
         }
         await supabase.from('spending_events').insert({
-          event_id: crypto.randomUUID(),
+          event_id: newEventId(),
           owner_id: uid,
           device_id: deviceId,
           source: 'ios-owner',

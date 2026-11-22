@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cartSubtotalCents, computeBudgetConsequence, sortPressingBudgets } from '../src/budget.ts';
+import { cartSubtotalCents, computeBudgetConsequence, monthAvailable, sortPressingBudgets } from '../src/budget.ts';
 import { FIXTURE_CART, FIXTURE_CATEGORIES, FIXTURE_HOODIE_PRICE_CENTS } from '../src/fixtures.ts';
 import type { BudgetCategory } from '../src/types.ts';
 
@@ -132,5 +132,40 @@ describe('sortPressingBudgets', () => {
     const input = [...FIXTURE_CATEGORIES];
     sortPressingBudgets(input);
     expect(input).toEqual(FIXTURE_CATEGORIES);
+  });
+});
+
+describe('monthAvailable', () => {
+  it('sums what is left across the seeded budgets', () => {
+    // 65 + 60 + 80 + 160 + 75 + 50
+    expect(monthAvailable(FIXTURE_CATEGORIES).availableCents).toBe(49_000);
+  });
+
+  it('lets an overspent budget drag the total down instead of flooring it', () => {
+    const over = monthAvailable([
+      cat({ name: 'Clothing', allocatedCents: 20_000, confirmedSpentCents: 24_000 }),
+      cat({ name: 'Beauty', allocatedCents: 8_000, confirmedSpentCents: 2_000 }),
+    ]);
+    // $40 over on Clothing, $60 left on Beauty → $20 really left, not $60.
+    expect(over.availableCents).toBe(2_000);
+    expect(over.overspentCents).toBe(4_000);
+  });
+
+  it('goes negative when the whole month is overspent', () => {
+    const r = monthAvailable([cat({ allocatedCents: 10_000, confirmedSpentCents: 15_000 })]);
+    expect(r.availableCents).toBe(-5_000);
+  });
+
+  it('counts only enabled budgets', () => {
+    const r = monthAvailable([
+      cat({ name: 'On', allocatedCents: 10_000, confirmedSpentCents: 2_000 }),
+      cat({ name: 'Off', allocatedCents: 50_000, confirmedSpentCents: 0, enabled: false }),
+    ]);
+    expect(r.availableCents).toBe(8_000);
+    expect(r.allocatedCents).toBe(10_000);
+  });
+
+  it('is zero for no budgets, and reports no overspend', () => {
+    expect(monthAvailable([])).toEqual({ availableCents: 0, allocatedCents: 0, confirmedSpentCents: 0, overspentCents: 0 });
   });
 });

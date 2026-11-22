@@ -7,8 +7,11 @@ import { emitEvent } from '../_shared/events.ts';
 import { handle, HttpError, json, optionalIso, readJson, requireUuid } from '../_shared/http.ts';
 import { notifyOwnerPhones } from '../_shared/push.ts';
 
-const COOLDOWN_REAL_MS = 30 * 60 * 1000;
-const COOLDOWN_SIMULATED_MS = 60 * 1000;
+// A burst guard for real crossings only: iOS can deliver the same one twice, and a late retry must
+// not buzz the phone again. A hand-pressed entry has no such problem — someone meant each tap — so
+// it is never rate limited. Rehearsing it back to back has to work.
+const COOLDOWN_REAL_MS = 15 * 1000;
+const COOLDOWN_SIMULATED_MS = 0;
 
 Deno.serve(handle(async (req) => {
   const admin = adminClient();
@@ -39,8 +42,8 @@ Deno.serve(handle(async (req) => {
   if (!hotspot.enabled) suppressed = 'disabled';
   else if (hotspot.snoozed_until && Date.parse(hotspot.snoozed_until) > Date.now()) suppressed = 'snoozed';
   else if (!isSimulated && !hotspot.verified) suppressed = 'unverified-hotspot';
-  else {
-    const cooldown = isSimulated ? COOLDOWN_SIMULATED_MS : COOLDOWN_REAL_MS;
+  else if (!isSimulated) {
+    const cooldown = COOLDOWN_REAL_MS;
     const since = new Date(Date.now() - cooldown).toISOString();
     let q = admin
       .from('spending_events')
@@ -77,18 +80,24 @@ Deno.serve(handle(async (req) => {
     if (bal) {
       const remaining = bal.allocated_cents - bal.confirmed_spent_cents;
       budgetLine = remaining >= 0
-        ? ` Your ${bal.name} budget has ${formatCad(remaining)} remaining.`
-        : ` Your ${bal.name} budget is ${formatCad(-remaining)} over.`;
+        ? ` You have ${formatCad(remaining)} left for ${bal.name} this month.`
+        : ` You are ${formatCad(-remaining)} over on ${bal.name} this month.`;
     }
   }
-  const title = isSimulated ? `Simulated: ${hotspot.name}` : `${hotspot.name} reminder`;
-  const body = `${deviceLabel} entered ${hotspot.name}.${budgetLine}`;
+
+  // A simulated entry says the same thing a real one would; the label rides on the subtitle so the
+  // sentence still reads properly (§1.4: simulated is always disclosed, never disguised).
+  const arrival = caller.kind === 'device' ? `${deviceLabel} just arrived at ${hotspot.name}.` : `You just arrived at ${hotspot.name}.`;
+  const title = hotspot.name;
+  const subtitle = isSimulated ? 'Simulated entry' : undefined;
+  const body = `${arrival}${budgetLine}`;
   const deliveries = await notifyOwnerPhones(admin, caller.ownerId, emitted.id, 'hotspot', {
     type,
     title,
+    subtitle,
     body,
     data: { hotspotId, isSimulated, eventId },
   });
 
-  return json({ accepted: true, suppressed: null, deliveries, message: { title, body } });
+  return json({ accepted: true, suppressed: null, deliveries, message: { title, subtitle, body } });
 }));

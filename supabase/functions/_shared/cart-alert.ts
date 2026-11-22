@@ -5,9 +5,10 @@
  *
  * The rules, in order:
  *  1. Only a cart that puts an enabled budget over gets an alert at all.
- *  2. One alert per cooldown window per owner, so adding a third item stays quiet.
- *  3. Inside the window, a materially worse cart may alert again (the overage grew by a step),
- *     because "$30 over" becoming "$200 over" is new information.
+ *  2. Every change to how far over you are is worth saying, because that is the number the alert
+ *     is about. Adding a second item, changing a quantity, swapping to a dearer size: all news.
+ *  3. The only thing suppressed is a burst — the same overage republished within seconds, which is
+ *     a retry or a double publish rather than a decision the shopper made.
  *
  * Observing a cart never records spending; this file only reads budgets and sends a message.
  */
@@ -15,10 +16,8 @@ import { computeBudgetConsequence, findBudgetCategoryFor, formatCad, getMerchant
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { notifyOwnerPhones, type DeliveryReport } from './push.ts';
 
-/** Quiet period after a cart alert. Short enough to re-arm during a demo, long enough not to nag. */
-const COOLDOWN_MS = 10 * 60 * 1000;
-/** Inside the cooldown, only a jump this much worse speaks up again. */
-const ESCALATION_CENTS = 5_000;
+/** Anti-burst window only: the same figure republished this fast is a retry, not a new decision. */
+const BURST_MS = 20 * 1000;
 
 export interface CartAlertOutcome {
   pushed: boolean;
@@ -79,8 +78,8 @@ export async function maybeAlertOnCart(
   if (!routed) return { pushed: false, reason: 'no-budget' };
   if (!worst || totalOverage === 0) return { pushed: false, reason: 'within-budget', overageCents: 0 };
 
-  // Cooldown, unless this cart got materially worse than the one we last spoke up about.
-  const since = new Date(Date.now() - COOLDOWN_MS).toISOString();
+  // Only swallow a repeat of the very same figure, and only for a few seconds.
+  const since = new Date(Date.now() - BURST_MS).toISOString();
   const { data: recent } = await admin
     .from('spending_events')
     .select('payload, received_at')
@@ -92,7 +91,7 @@ export async function maybeAlertOnCart(
     .limit(1);
 
   const last = recent?.[0]?.payload as { alertedOverageCents?: number } | undefined;
-  if (last && typeof last.alertedOverageCents === 'number' && totalOverage < last.alertedOverageCents + ESCALATION_CENTS) {
+  if (last && last.alertedOverageCents === totalOverage) {
     return { pushed: false, reason: 'cooldown', overageCents: totalOverage };
   }
 

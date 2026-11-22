@@ -78,12 +78,16 @@ Deno.serve(handle(async (req) => {
     });
     // A receipt is only news on another device: undoing on the phone needs no push to the phone.
     if (caller.kind === 'device' && emittedReversal.inserted) {
-      await notifyOwnerPhones(admin, caller.ownerId, emittedReversal.id, 'cart', {
-        type: 'PURCHASE_REVERSED',
-        title: 'Purchase undone',
-        body: `${formatCad(back)} is back in your budgets.`,
-        data: { reversal: true },
-      });
+      try {
+        await notifyOwnerPhones(admin, caller.ownerId, emittedReversal.id, 'cart', {
+          type: 'PURCHASE_REVERSED',
+          title: 'Purchase undone',
+          body: `${formatCad(back)} is back in your budgets.`,
+          data: { reversal: true },
+        });
+      } catch (e) {
+        console.error('undo receipt push failed; reversal stands', e);
+      }
     }
     return json({ reversed: true, reversals });
   }
@@ -170,15 +174,21 @@ Deno.serve(handle(async (req) => {
 
   // Receipt on the phone when the purchase was confirmed somewhere else (the browser).
   // The budget line is the point: this is the moment the number actually moved.
+  // Never fatal: the spending is already recorded, and a failed receipt must not read as a failed
+  // purchase to the caller — that would invite a second tap and a second ledger row.
   if (caller.kind === 'device' && emitted.inserted && !duplicate) {
-    const label = isMerchantKey(merchantKey) ? getMerchant(merchantKey).label : merchantKey;
-    const names = expenses.map((e) => e.categoryName).filter((n): n is string => !!n);
-    await notifyOwnerPhones(admin, caller.ownerId, emitted.id, 'cart', {
-      type: 'PURCHASE_CONFIRMED',
-      title: `${formatCad(totalCents)} at ${label}`,
-      body: names.length > 0 ? `Recorded against ${names.join(' and ')}. Undo from the extension if that was wrong.` : 'Recorded.',
-      data: { confirmationKey, merchantKey },
-    });
+    try {
+      const label = isMerchantKey(merchantKey) ? getMerchant(merchantKey).label : merchantKey;
+      const names = expenses.map((e) => e.categoryName).filter((n): n is string => !!n);
+      await notifyOwnerPhones(admin, caller.ownerId, emitted.id, 'cart', {
+        type: 'PURCHASE_CONFIRMED',
+        title: `${formatCad(totalCents)} at ${label}`,
+        body: names.length > 0 ? `Recorded against ${names.join(' and ')}. Undo from the extension if that was wrong.` : 'Recorded.',
+        data: { confirmationKey, merchantKey },
+      });
+    } catch (e) {
+      console.error('purchase receipt push failed; purchase stands', e);
+    }
   }
 
   return json({ confirmationKey, totalCents, expenses, duplicate, eventRecorded: emitted.inserted });

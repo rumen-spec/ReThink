@@ -2,11 +2,11 @@
  * Me (SPEC §5.9): identity, plan, alerts and location permissions, connected devices (revoke),
  * pair a device, privacy, demo tools, logs. Rows and hairlines, no cards.
  */
-import { formatCad, formatLogEntry, getRecentLogs } from '@rethink/shared';
+import { formatCad } from '@rethink/shared';
 import { useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import { useEffect, useState } from 'react';
-import { ScrollView, Share, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/ui/button';
@@ -28,7 +28,6 @@ export default function MeScreen() {
   const [busy, setBusy] = useState<string | null>(null);
   const [pair, setPair] = useState<{ code: string; role: string; expiresAt: string } | null>(null);
   const [status, setStatus] = useState('');
-  const [showLogs, setShowLogs] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [alerts, setAlerts] = useState<'on' | 'off' | 'unknown'>('unknown');
   const [loc, setLoc] = useState<LocationState>('unknown');
@@ -58,15 +57,13 @@ export default function MeScreen() {
       setPair({ ...(await a.createPairCode(role)), role });
     });
 
-  const clothing = s.categories.find((c) => c.productCategory === 'clothing');
-  const logs = getRecentLogs();
 
   return (
     <SafeAreaView style={st.safe} edges={['top']}>
       <ScrollView contentContainerStyle={st.content}>
         <View>
           <Title>{s.displayName ?? '…'}</Title>
-          <Caption>Demo profile · anonymous session {s.userId ? s.userId.slice(0, 8) : ''}</Caption>
+          <Caption>{s.periodLabel ?? 'This month'}</Caption>
         </View>
 
         <View style={st.section}>
@@ -196,18 +193,16 @@ export default function MeScreen() {
           </Surface>
         </View>
 
+        {/*
+          Kept deliberately small: a test alert and a reset, both of which the runbook uses before
+          going on stage. The allocation nudges and the log viewer are gone — anything that reads as
+          a developer tool should not be on a screen a judge might scroll.
+        */}
         <View style={st.section}>
-          <SectionHeader title="Demo tools" />
+          <SectionHeader title="Reset" />
           <Surface>
-          <Secondary>For the demo only. Anything created here is labelled as such.</Secondary>
           <View style={st.wrap}>
             <Button label="Test notification" small onPress={() => run('notify', () => a.sendTestNotification())} busy={busy === 'notify'} />
-            {clothing ? (
-              <>
-                <Button label="−$50 Clothing" small onPress={() => run('alloc', () => a.setAllocation(clothing.id, Math.max(0, clothing.allocatedCents - 5000)))} busy={busy === 'alloc'} />
-                <Button label="+$50 Clothing" small onPress={() => run('alloc', () => a.setAllocation(clothing.id, clothing.allocatedCents + 5000))} busy={busy === 'alloc'} />
-              </>
-            ) : null}
             {confirmReset ? (
               <>
                 <Button
@@ -232,16 +227,6 @@ export default function MeScreen() {
           {confirmReset ? <Secondary>Resets budgets, carts and events to the seeded state. Devices stay paired.</Secondary> : null}
           {status ? <Secondary>{status}</Secondary> : null}
           </Surface>
-        </View>
-
-        <View style={st.section}>
-          <SectionHeader title={`Logs · ${logs.length}`} action={{ label: showLogs ? 'Hide' : 'Show', onPress: () => setShowLogs((v) => !v) }} />
-          {showLogs ? (
-            <Surface>
-              <Button label="Share logs" small onPress={() => void Share.share({ message: logs.map(formatLogEntry).join('\n') })} />
-              {logs.length === 0 ? <Secondary>Nothing logged yet.</Secondary> : [...logs].reverse().slice(0, 40).map((e, i) => <Caption key={i} color={e.level === 'error' ? T.coral : e.level === 'warn' ? T.ink : T.muted}>{formatLogEntry(e)}</Caption>)}
-            </Surface>
-          ) : null}
         </View>
       </ScrollView>
     </SafeAreaView>

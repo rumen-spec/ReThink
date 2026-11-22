@@ -3,7 +3,7 @@
  * Future Me. Nothing explains itself in a sentence: a budget the cart pushes over turns coral, and
  * the graph grows a coral path. All money from @rethink/shared.
  */
-import { cartSubtotalsByCategory, computeBudgetConsequence, findBudgetCategoryFor, formatCad, isProductCategoryKey, sortPressingBudgets } from '@rethink/shared';
+import { cartSubtotalsByCategory, computeBudgetConsequence, findBudgetCategoryFor, formatCad, isProductCategoryKey, monthAvailable, sortPressingBudgets } from '@rethink/shared';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
@@ -46,7 +46,8 @@ export default function HomeScreen() {
     }
     return { over: worst, overageCents: total };
   }, [byCategory, enabled]);
-  const availableCents = enabled.reduce((n, c) => n + Math.max(0, c.allocatedCents - c.confirmedSpentCents), 0);
+  // Derived in @rethink/shared, never here. Overspend subtracts rather than being floored away.
+  const month = useMemo(() => monthAvailable(enabled), [enabled]);
 
   const pressing = sortPressingBudgets(enabled);
   const rows = showAll ? pressing : pressing.slice(0, 2);
@@ -83,7 +84,13 @@ export default function HomeScreen() {
           </Surface>
         ) : null}
 
-        {s.periodId ? <Hero label="Available this month" value={formatCad(availableCents)} /> : null}
+        {s.periodId ? (
+          <Hero
+            label={month.availableCents < 0 ? 'Over budget this month' : 'Available this month'}
+            value={formatCad(Math.abs(month.availableCents))}
+            tone={month.availableCents < 0 ? 'over' : 'plain'}
+          />
+        ) : null}
 
         {s.cart ? <CartRow cart={s.cart} /> : null}
 

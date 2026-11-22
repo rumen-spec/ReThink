@@ -3,6 +3,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 export interface PushMessage {
   type: string;
   title: string;
+  /** iOS second line, bold under the title. Where provenance labels live so the body reads normally. */
+  subtitle?: string;
   body: string;
   data?: Record<string, unknown>;
 }
@@ -59,7 +61,14 @@ export async function notifyOwnerPhones(
       const res = await fetch('https://exp.host/--/api/v2/push/send', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ to: token, title: msg.title, body: msg.body, data: { type: msg.type, ...msg.data }, sound: 'default' }),
+        body: JSON.stringify({
+          to: token,
+          title: msg.title,
+          ...(msg.subtitle ? { subtitle: msg.subtitle } : {}),
+          body: msg.body,
+          data: { type: msg.type, ...msg.data },
+          sound: 'default',
+        }),
       });
       const out = await res.json().catch(() => ({}));
       const ticket = out?.data?.[0] ?? out?.data;

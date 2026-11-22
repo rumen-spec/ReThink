@@ -15,6 +15,10 @@ if (!url || !anonKey) {
 }
 l.debug('client configured', { url });
 
+/** Public values, also used by the token-authenticated trigger calls in lib/trigger.ts. */
+export const SUPABASE_URL = url;
+export const SUPABASE_ANON_KEY = anonKey;
+
 /** Public values only (RLS protects data). The owner's session is the credential. */
 export const supabase = createClient(url, anonKey, {
   auth: { storage: AsyncStorage, autoRefreshToken: true, persistSession: true, detectSessionInUrl: false },
